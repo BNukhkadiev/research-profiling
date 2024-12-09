@@ -71,6 +71,17 @@ TEMPLATES = [
         },
     },
 ]
+# Add the following configuration to the settings.py file:
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 

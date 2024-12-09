@@ -3,11 +3,18 @@ import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+from rest_framework.authtoken.models import Token  # For token-based auth
+from rest_framework.permissions import AllowAny
+from django.utils.decorators import method_decorator
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
+@method_decorator(csrf_exempt, name='dispatch')
 class DBLPSearchView(APIView):
+    permission_classes = [AllowAny]
     """
     Handles search for authors on DBLP.
     """
@@ -36,6 +43,7 @@ class DBLPSearchView(APIView):
 
 
 class DBLPPublicationSearchView(APIView):
+    permission_classes = [AllowAny]
     """
     Handles search for publications on DBLP.
     """
@@ -61,3 +69,4 @@ class DBLPPublicationSearchView(APIView):
         except requests.exceptions.RequestException as e:
             logger.error(f"Error while calling DBLP API: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

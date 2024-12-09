@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import axios from "axios";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -37,19 +36,19 @@ const SearchResultsPage: React.FC = () => {
   const navigate = useNavigate();
   const initialQuery = searchParams.get("query") || "";
   const [query, setQuery] = useState(initialQuery);
+  const [searchQuery, setSearchQuery] = useState(initialQuery); // Query for API calls
   const [activeTab, setActiveTab] = useState<"researchers" | "publications">(
     "researchers"
   );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [selectedResearchers, setSelectedResearchers] = useState<string[]>([]);
 
   const { data: researchers = [], isLoading: loadingResearchers } =
-    useResearchersQuery(activeTab === "researchers" ? query : "");
+    useResearchersQuery(activeTab === "researchers" ? searchQuery : "");
   const { data: publications = [], isLoading: loadingPublications } =
-    usePublicationsQuery(activeTab === "publications" ? query : "");
+    usePublicationsQuery(activeTab === "publications" ? searchQuery : "");
 
   const handleSearch = () => {
+    setSearchQuery(query);
     navigate(`?query=${query}`);
   };
 
@@ -61,9 +60,19 @@ const SearchResultsPage: React.FC = () => {
     );
   };
 
+  const handleViewProfile = (author: string, profileUrl: string) => {
+    navigate("/profile", { state: { author, profileUrl } });
+  };
+
   const handleGetToComparison = () => {
     // Navigate to a comparison page with selected researchers
     navigate(`/comparison?authors=${selectedResearchers.join(",")}`);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" && query.trim()) {
+      handleSearch();
+    }
   };
 
   return (
@@ -75,6 +84,7 @@ const SearchResultsPage: React.FC = () => {
           variant="outlined"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown} // Trigger search on Enter key
           sx={{ flexGrow: 1, marginRight: 2 }}
         />
         <Button
@@ -116,10 +126,8 @@ const SearchResultsPage: React.FC = () => {
       )}
 
       {/* Results */}
-      {loading ? (
+      {loadingResearchers || loadingPublications ? (
         <Typography>Loading...</Typography>
-      ) : error ? (
-        <Typography color="error">{error}</Typography>
       ) : (
         <Box>
           {activeTab === "researchers"
@@ -142,6 +150,12 @@ const SearchResultsPage: React.FC = () => {
                   isSelected={selectedResearchers.includes(
                     researcher.info.author
                   )}
+                  onViewProfile={() =>
+                    handleViewProfile(
+                      researcher.info.author,
+                      researcher.info.url
+                    )
+                  }
                 />
               ))
             : publications.map((publication: any, index: number) => {
