@@ -2,11 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
 // Define the response type
+interface Author {
+  name: string;
+  id: string; // Include author ID
+}
+
 interface Publication {
   url: string;
   title: string;
   year: number;
-  authors: { name: string }[];
+  authors: Author[]; // Use the updated Author type
+  abstract?: string;
+  venue?: string;
+  citationCount?: number;
+  fieldsOfStudy?: string[];
 }
 
 // Fetch function for publications
@@ -17,14 +26,22 @@ const fetchPublications = async (authorId: string): Promise<Publication[]> => {
       params: { author_id: authorId }, // Use `author_id` as the query parameter
     }
   );
-  return response.data?.data?.map((publication: any) => ({
-    url: publication.url,
-    title: publication.title,
-    year: publication.year,
-    authors: publication.authors.map((author: any) => ({
-      name: author.name,
-    })),
-  })) || []; // Map the response structure to match the frontend types
+
+  return (
+    response.data?.publications?.map((publication: any) => ({
+      url: publication.url,
+      title: publication.title,
+      year: publication.year,
+      authors: publication.authors.map((author: any) => ({
+        name: author.name,
+        id: author.id, // Map the author ID from the API response
+      })),
+      abstract: publication.abstract,
+      venue: publication.venue,
+      citationCount: publication.citationCount,
+      fieldsOfStudy: publication.fieldsOfStudy,
+    })) || []
+  );
 };
 
 // React Query hook for publications

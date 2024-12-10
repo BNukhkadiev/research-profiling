@@ -11,18 +11,24 @@ interface AuthorDetailsResponse {
   citationCount: number;
 }
 
-const fetchAuthorDetails = async (authorId: string): Promise<AuthorDetailsResponse> => {
+const fetchAuthorDetails = async (
+  authorId: string,
+  affiliation: string
+): Promise<AuthorDetailsResponse> => {
   const response = await axios.get("http://127.0.0.1:8000/api/author-details/", {
-    params: { author_id: authorId }, // Pass author_id as query parameter
+    params: {
+      author_id: authorId, // Pass author_id as query parameter
+      affiliation: affiliation, // Pass affiliation as query parameter
+    },
   });
   return response.data;
 };
 
 // React Query hook for author details
-export const useAuthorDetailsQuery = (authorId: string) => {
+export const useAuthorDetailsQuery = (authorId: string, affiliation: string) => {
   return useQuery<AuthorDetailsResponse>({
-    queryKey: ["authorDetails", authorId], // Unique key based on author ID
-    queryFn: () => fetchAuthorDetails(authorId), // Fetching function
+    queryKey: ["authorDetails", authorId, affiliation], // Unique key based on author ID and affiliation
+    queryFn: () => fetchAuthorDetails(authorId, affiliation), // Fetching function
     enabled: !!authorId, // Ensure the query runs only if authorId exists
   });
 };

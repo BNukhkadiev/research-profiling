@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, Button } from "@mui/material";
+import { Box, Typography, Button, Tooltip } from "@mui/material";
 
 interface SearchCardProps {
   name: string;
@@ -32,14 +32,36 @@ const SearchCard: React.FC<SearchCardProps> = ({
         },
       }}
     >
-      <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+      <Typography
+        variant="h6"
+        sx={{
+          fontWeight: "bold",
+          wordWrap: "break-word",
+        }}
+      >
         {name}
       </Typography>
-      <Typography variant="body2" color="textSecondary" sx={{ marginTop: 1 }}>
-        {affiliations.length > 0
-          ? affiliations.join(", ")
-          : "No affiliations available"}
-      </Typography>
+      <Tooltip
+        title={affiliations.length > 0 ? affiliations.join(", ") : "No affiliations available"}
+        placement="bottom-start"
+        arrow
+      >
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          sx={{
+            marginTop: 1,
+            wordWrap: "break-word", // Ensure long affiliations don't overflow
+            maxHeight: "4.5rem", // Limit displayed affiliations
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {affiliations.length > 0
+            ? affiliations.join(", ")
+            : "No affiliations available"}
+        </Typography>
+      </Tooltip>
       <Box
         sx={{
           display: "flex",

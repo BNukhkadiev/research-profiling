@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Typography, Button } from "@mui/material";
+import { useNavigate } from "react-router-dom"; // Import useNavigate for navigation
 import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 
 interface PublicationsListProps {
@@ -7,6 +8,7 @@ interface PublicationsListProps {
 }
 
 const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
+  const navigate = useNavigate(); // Initialize navigate
   const {
     data: publications = [],
     isLoading,
@@ -44,6 +46,11 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
     setVisibleCount((prevCount) => prevCount + 5); // Load 5 more publications
   };
 
+  // Handle navigation to the PublicationDetails page
+  const handleViewDetails = (publicationId: string) => {
+    navigate(`/publication/${publicationId}`);
+  };
+
   return (
     <Box>
       {publications.slice(0, visibleCount).map((publication, index) => (
@@ -74,16 +81,29 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
             Year: {publication.year || "Unknown Year"}
           </Typography>
 
-          {/* URL */}
-          <Typography variant="body2" color="primary">
-            <a
-              href={publication.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View Publication
-            </a>
-          </Typography>
+          {/* Citation Count */}
+          {publication.citationCount !== undefined && (
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              Citations: {publication.citationCount}
+            </Typography>
+          )}
+
+          {/* Fields of Study */}
+          {publication.fieldsOfStudy && publication.fieldsOfStudy.length > 0 && (
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              Fields of Study: {publication.fieldsOfStudy.join(", ")}
+            </Typography>
+          )}
+
+          {/* View Details Button */}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => handleViewDetails(publication.url.split("/").pop() || "")}
+            sx={{ textTransform: "none", marginTop: 1 }}
+          >
+            View Details
+          </Button>
         </Box>
       ))}
 

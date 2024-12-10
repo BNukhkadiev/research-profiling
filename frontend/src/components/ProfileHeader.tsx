@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, Button } from "@mui/material";
+import { Box, Typography, Button, Tooltip } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
@@ -49,29 +49,48 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           }}
         />
         <Box>
-          <Typography variant="h6" sx={{ marginBottom: 0.5 }}>
+          <Typography variant="h6" sx={{ marginBottom: 0.5, wordWrap: "break-word" }}>
             {author}
           </Typography>
-          <Typography variant="body2" color="textSecondary">
-            {affiliations || "Affiliations not available"}
-          </Typography>
+          <Tooltip title={affiliations || "Affiliations not available"} arrow>
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              sx={{
+                wordWrap: "break-word",
+                maxHeight: "4.5rem",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {affiliations || "Affiliations not available"}
+            </Typography>
+          </Tooltip>
           <Box sx={{ display: "flex", gap: 1, marginTop: 1 }}>
-            <EmailIcon
-              sx={{ color: "#555", cursor: "pointer" }}
-              titleAccess="Email"
-            />
-            <GitHubIcon
-              sx={{ color: "#555", cursor: "pointer" }}
-              titleAccess="GitHub"
-            />
-            <LinkedInIcon
-              sx={{ color: "#555", cursor: "pointer" }}
-              titleAccess="LinkedIn"
-            />
-            <PeopleIcon
-              sx={{ color: "#555", cursor: "pointer" }}
-              titleAccess="Social Profile"
-            />
+            <Tooltip title="Email" arrow>
+              <EmailIcon
+                sx={{ color: "#555", cursor: "pointer" }}
+                onClick={() => window.open(`mailto:${author}@example.com`)} // Example email functionality
+              />
+            </Tooltip>
+            <Tooltip title="GitHub" arrow>
+              <GitHubIcon
+                sx={{ color: "#555", cursor: "pointer" }}
+                onClick={() => window.open("https://github.com", "_blank")} // Example GitHub link
+              />
+            </Tooltip>
+            <Tooltip title="LinkedIn" arrow>
+              <LinkedInIcon
+                sx={{ color: "#555", cursor: "pointer" }}
+                onClick={() => window.open("https://linkedin.com", "_blank")} // Example LinkedIn link
+              />
+            </Tooltip>
+            <Tooltip title="Social Profile" arrow>
+              <PeopleIcon
+                sx={{ color: "#555", cursor: "pointer" }}
+                onClick={() => window.open(profileUrl || "#", "_blank")} // Profile link
+              />
+            </Tooltip>
           </Box>
         </Box>
       </Box>

@@ -6,6 +6,7 @@ import SearchResultsPage from "./pages/SearchResultsPage";
 import "./app.css"; // Import the CSS file
 import ResearcherProfilePage from "./pages/ResearcherProfilePage";
 import CompareResearchersPage from "./pages/CompareResearchersPage";
+import PublicationDetailsPage from "./pages/PublicationDetailsPage"; // Import the new page
 
 function App() {
   return (
@@ -13,13 +14,17 @@ function App() {
       <Header />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/search" element={<SearchResultsPage />} />{" "}
-        <Route path="/profile/:authorId" element={<ResearcherProfilePage />} />
+        <Route path="/search" element={<SearchResultsPage />} />
+        <Route
+          path="/profile/:authorId/:affiliation"
+          element={<ResearcherProfilePage />}
+        />
         <Route
           path="/compare-researchers"
           element={<CompareResearchersPage />}
         />
-        {/* Add this */}
+        <Route path="/publication/:publicationId" element={<PublicationDetailsPage />} />
+        {/* Added the route for PublicationDetailsPage */}
       </Routes>
     </Router>
   );

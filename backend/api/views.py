@@ -9,48 +9,126 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token  # For token-based auth
 from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
+import xml.etree.ElementTree as ET
+import string
+import difflib
+
 
 # Set up logging
 logger = logging.getLogger(__name__)
 @method_decorator(csrf_exempt, name='dispatch')
 class SemanticScholarSearchView(APIView):
     permission_classes = [AllowAny]
-    """
-    Handles search for authors on Semantic Scholar.
-    """
+
     def get(self, request):
-        # Get the search term from the query parameter
         search_query = request.GET.get('query', '')
         logger.info(f"Received author search request with query: {search_query}")
 
         if not search_query:
             return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Query the Semantic Scholar API for authors
-        semantic_scholar_url = (
-            f"https://api.semanticscholar.org/graph/v1/author/search?"
-            f"query={search_query}&fields=name,url"
-        )
-        logger.info(f"Making request to Semantic Scholar API: {semantic_scholar_url}")
-
         try:
+            # Query Semantic Scholar
+            semantic_scholar_url = (
+                f"https://api.semanticscholar.org/graph/v1/author/search?"
+                f"query={search_query}&fields=name,url,affiliations,paperCount,hIndex,citationCount,"
+                f"externalIds,papers.title,papers.year"
+            )
+            logger.info(f"Querying Semantic Scholar API: {semantic_scholar_url}")
             semantic_scholar_response = requests.get(semantic_scholar_url)
-            logger.info(f"Semantic Scholar API response status code: {semantic_scholar_response.status_code}")
-            semantic_scholar_response.raise_for_status()  # Raise error for HTTP issues
-            data = semantic_scholar_response.json()  # Parse JSON response
-            logger.info(f"Semantic Scholar API response data: {data}")
-            return Response(data, status=status.HTTP_200_OK)
+            semantic_scholar_response.raise_for_status()
+            semantic_scholar_data = semantic_scholar_response.json()
+
+            # Query DBLP
+            dblp_url = f"https://dblp.org/search/author/api?q={search_query}&format=json"
+            logger.info(f"Querying DBLP API: {dblp_url}")
+            dblp_response = requests.get(dblp_url)
+            dblp_response.raise_for_status()
+            dblp_data = dblp_response.json()
+
+            if not semantic_scholar_data.get("data") or not dblp_data.get("result", {}).get("hits", {}).get("hit"):
+                logger.warning("No authors found in Semantic Scholar or DBLP.")
+                return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Process authors
+            dblp_authors = dblp_data["result"]["hits"]["hit"]
+            processed_authors = []
+            for scholar_author in semantic_scholar_data["data"]:
+                scholar_paper_titles = {
+                    paper["title"].strip().rstrip(".") for paper in scholar_author.get("papers", []) if "title" in paper
+                }
+
+                best_match = None
+                max_intersection_size = 0
+
+                for dblp_author in dblp_authors:
+                    author_name = dblp_author["info"]["author"]
+                    author_url = dblp_author["info"].get("url")
+                    dblp_affiliations = []
+                    dblp_paper_titles = []
+
+                    if not author_url:
+                        logger.debug(f"No URL found for DBLP author: {author_name}")
+                        continue
+
+                    try:
+                        # Fetch DBLP XML
+                        logger.info(f"Fetching DBLP XML for author: {author_name} from {author_url}")
+                        author_profile_response = requests.get(f"{author_url}.xml")
+                        author_profile_response.raise_for_status()
+                        root = ET.fromstring(author_profile_response.text)
+
+                        # Extract DBLP paper titles
+                        dblp_paper_titles = [title.text.rstrip(".") for title in root.findall(".//title")]
+                        logger.debug(f"Extracted DBLP titles for {author_name}: {dblp_paper_titles}")
+                        # print(f"Extracted DBLP titles for {author_name}: {dblp_paper_titles}")
+
+                        # Extract affiliations from DBLP notes
+                        if "notes" in dblp_author["info"]:
+                            notes = dblp_author["info"]["notes"].get("note", [])
+                            if isinstance(notes, dict):  # Single note case
+                                notes = [notes]
+                            dblp_affiliations = [
+                                note["text"] for note in notes if note.get("@type") == "affiliation"
+                            ]
+                            logger.debug(f"Extracted affiliations for {author_name}: {dblp_affiliations}")
+                            # print(f"Extracted affiliations for {author_name}: {dblp_affiliations}")
+                        # Determine the intersection size
+                        intersection_size = len(scholar_paper_titles.intersection(dblp_paper_titles))
+                        logger.debug(f"Intersection size for {author_name}: {intersection_size}")
+                        print(f"Intersection size for {author_name}: {intersection_size}")
+
+                        if intersection_size > max_intersection_size and intersection_size>3:
+                            max_intersection_size = intersection_size
+                            best_match = {"affiliations": dblp_affiliations}
+
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"Error fetching DBLP XML for author {author_name}: {e}")
+                    except ET.ParseError as e:
+                        logger.error(f"Error parsing DBLP XML for author {author_name}: {e}")
+
+                # Add the best match's affiliations
+                if best_match:
+                    scholar_author["affiliations"].extend(best_match["affiliations"])
+                else:
+                    logger.warning(f"No match found for Semantic Scholar author: {scholar_author['name']}")
+
+                processed_authors.append(scholar_author)
+
+            logger.info("Processed authors with enriched affiliations.")
+            return Response({"data": processed_authors}, status=status.HTTP_200_OK)
+
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error while calling Semantic Scholar API: {e}")
+            logger.error(f"Error querying APIs: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-
+#########
 class PublicationSearchView(APIView):
     permission_classes = [AllowAny]
     """
     Handles retrieval of publications for a given author using Semantic Scholar.
     """
+
     def get(self, request):
         # Get the author ID from the query parameter
         author_id = request.GET.get('author_id', '')
@@ -59,35 +137,63 @@ class PublicationSearchView(APIView):
         if not author_id:
             return Response({"error": "Author ID parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Query the Semantic Scholar API for publications by author ID
+        # Semantic Scholar API query URL with expanded fields
         semantic_scholar_url = (
             f"https://api.semanticscholar.org/graph/v1/author/{author_id}/papers?"
-            f"fields=url,title,year,authors"
+            f"fields=url,title,year,authors,abstract,venue,citationCount,fieldsOfStudy"
         )
         logger.info(f"Making request to Semantic Scholar API: {semantic_scholar_url}")
 
         try:
+            # Make the API request
             semantic_scholar_response = requests.get(semantic_scholar_url)
             logger.info(f"Semantic Scholar API response status code: {semantic_scholar_response.status_code}")
             semantic_scholar_response.raise_for_status()  # Raise error for HTTP issues
-            data = semantic_scholar_response.json()  # Parse JSON response
-            logger.info(f"Semantic Scholar API response data: {data}")
-            return Response(data, status=status.HTTP_200_OK)
+            
+            # Parse JSON response
+            data = semantic_scholar_response.json()
+            
+            # Transform the data into a structured response if needed
+            publications = data.get("data", [])
+            formatted_publications = []
+            for pub in publications:
+                formatted_publications.append({
+                    "url": pub.get("url"),
+                    "title": pub.get("title"),
+                    "year": pub.get("year"),
+                    "authors": [
+                        {"name": author.get("name"), "id": author.get("authorId")}
+                        for author in pub.get("authors", [])
+                    ],
+                    "abstract": pub.get("abstract"),
+                    "venue": pub.get("venue"),
+                    "citationCount": pub.get("citationCount"),
+                    "fieldsOfStudy": pub.get("fieldsOfStudy"),
+                })
+
+            # Return the transformed response
+            logger.info(f"Successfully fetched and formatted {len(formatted_publications)} publications.")
+            return Response({"publications": formatted_publications}, status=status.HTTP_200_OK)
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Error while calling Semantic Scholar API: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
 class AuthorDetailsView(APIView):
     permission_classes = [AllowAny]
     """
-    Handles fetching author details from Semantic Scholar.
+    Handles fetching author details from Semantic Scholar and processes the affiliation.
     """
 
     def get(self, request):
-        # Get the author ID from the query parameter
+        # Get the author ID and affiliation from the query parameters
         author_id = request.GET.get("author_id", "")
-        logger.info(f"Received request to fetch details for author ID: {author_id}")
+        affiliation = request.GET.get("affiliation", "")
+        logger.info(
+            f"Received request to fetch details for author ID: {author_id} with affiliation: {affiliation}"
+        )
 
         if not author_id:
             return Response(
@@ -107,8 +213,12 @@ class AuthorDetailsView(APIView):
             semantic_scholar_response.raise_for_status()
             author_data = semantic_scholar_response.json()
 
-            # Return the author data
-            logger.info(f"Author data fetched successfully: {author_data}")
+            # Attach the provided affiliation if not already present
+            if affiliation and affiliation not in author_data.get("affiliations", []):
+                author_data.setdefault("affiliations", []).append(affiliation)
+
+            # Return the enriched author data
+            logger.info(f"Author data fetched and processed successfully: {author_data}")
             return Response(author_data, status=status.HTTP_200_OK)
 
         except requests.exceptions.RequestException as e:
@@ -117,3 +227,52 @@ class AuthorDetailsView(APIView):
                 {"error": "Failed to fetch author details."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class PaperDetailsView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Handles retrieval of paper details using Semantic Scholar.
+    """
+
+    def get(self, request):
+        # Get the paper ID from the query parameter
+        paper_id = request.GET.get('paper_id', '')
+        logger.info(f"Received paper details request for paper ID: {paper_id}")
+
+        if not paper_id:
+            return Response({"error": "Paper ID parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Semantic Scholar API query URL for a specific paper
+        semantic_scholar_url = (
+            f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}?"
+            f"fields=url,year,authors,abstract,fieldsOfStudy,venue"
+        )
+        logger.info(f"Making request to Semantic Scholar API: {semantic_scholar_url}")
+
+        try:
+            # Make the API request
+            semantic_scholar_response = requests.get(semantic_scholar_url)
+            logger.info(f"Semantic Scholar API response status code: {semantic_scholar_response.status_code}")
+            semantic_scholar_response.raise_for_status()  # Raise error for HTTP issues
+            
+            # Parse JSON response
+            paper_data = semantic_scholar_response.json()
+            
+            # Transform the data into a structured response
+            formatted_paper = {
+                "url": paper_data.get("url"),
+                "year": paper_data.get("year"),
+                "authors": [{"name": author.get("name")} for author in paper_data.get("authors", [])],
+                "abstract": paper_data.get("abstract"),
+                "fieldsOfStudy": paper_data.get("fieldsOfStudy"),
+                "venue": paper_data.get("venue"),
+            }
+
+            # Return the transformed response
+            logger.info(f"Successfully fetched paper details for paper ID {paper_id}.")
+            return Response({"paper": formatted_paper}, status=status.HTTP_200_OK)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error while calling Semantic Scholar API: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

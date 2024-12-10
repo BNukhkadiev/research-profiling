@@ -13,6 +13,7 @@ import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 interface Researcher {
   name: string;
   url: string;
+  affiliations: string[]; // Add affiliations to the Researcher type
 }
 
 interface Publication {
@@ -55,9 +56,16 @@ const SearchResultsPage: React.FC = () => {
     );
   };
 
-  const handleViewProfile = (authorName: string, profileUrl: string) => {
+  const handleViewProfile = (
+    authorName: string,
+    profileUrl: string,
+    affiliations: string[]
+  ) => {
     const authorId = profileUrl.split("/").pop(); // Extract the author ID from the URL
-    navigate(`/profile/${authorId}`, { state: { authorName, authorId } });
+    const affiliation = affiliations.length > 0 ? affiliations[0] : "Unknown";
+    navigate(`/profile/${authorId}/${encodeURIComponent(affiliation)}`, {
+      state: { authorName, authorId },
+    });
   };
 
   const handleGetToComparison = () => {
@@ -132,12 +140,16 @@ const SearchResultsPage: React.FC = () => {
                 <SearchCard
                   key={`${researcher.url}-${index}`} // Ensure unique keys
                   name={researcher.name}
-                  affiliations={[]} // Semantic Scholar doesn't provide affiliations in this query
+                  affiliations={researcher.affiliations} // Pass affiliations to SearchCard
                   profileUrl={researcher.url}
                   addToCompare={() => handleAddToCompare(researcher.name)}
                   isSelected={selectedResearchers.includes(researcher.name)}
                   onViewProfile={() =>
-                    handleViewProfile(researcher.name, researcher.url)
+                    handleViewProfile(
+                      researcher.name,
+                      researcher.url,
+                      researcher.affiliations
+                    )
                   }
                 />
               ))

@@ -5,8 +5,11 @@ import Typography from "@mui/material/Typography";
 interface PublicationCardProps {
   title: string;
   authors: string[]; // Array of author names as strings
-  venue: string; // Year or publication venue
+  venue: string; // Publication venue or year
   url: string; // URL for the publication
+  abstract?: string; // Abstract of the publication (optional)
+  citationCount?: number; // Citation count (optional)
+  fieldsOfStudy?: string[]; // Fields of study (optional)
 }
 
 const PublicationCard: React.FC<PublicationCardProps> = ({
@@ -14,6 +17,9 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
   authors,
   venue,
   url,
+  abstract,
+  citationCount,
+  fieldsOfStudy,
 }) => {
   // Format authors into a single string or a fallback if empty
   const formattedAuthors = authors.length > 0 ? authors.join(", ") : "Unknown Authors";
@@ -39,9 +45,30 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
       </Typography>
 
       {/* Venue */}
-      <Typography variant="body2" gutterBottom>
-        {`Year: ${venue || "Unknown Year"}`}
+      <Typography variant="body2" color="textSecondary" gutterBottom>
+        {`Venue: ${venue || "Unknown Venue"}`}
       </Typography>
+
+      {/* Abstract */}
+      {abstract && (
+        <Typography variant="body2" gutterBottom>
+          {`Abstract: ${abstract}`}
+        </Typography>
+      )}
+
+      {/* Citation Count */}
+      {citationCount !== undefined && (
+        <Typography variant="body2" color="textSecondary" gutterBottom>
+          {`Citations: ${citationCount}`}
+        </Typography>
+      )}
+
+      {/* Fields of Study */}
+      {fieldsOfStudy && fieldsOfStudy.length > 0 && (
+        <Typography variant="body2" color="textSecondary" gutterBottom>
+          {`Fields of Study: ${fieldsOfStudy.join(", ")}`}
+        </Typography>
+      )}
 
       {/* URL */}
       <Typography variant="body2">
