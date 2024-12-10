@@ -3,15 +3,16 @@ import { Box, Typography, Button } from "@mui/material";
 import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 
 interface PublicationsListProps {
-  author: string;
+  authorId: string;
 }
 
-const PublicationsList: React.FC<PublicationsListProps> = ({ author }) => {
+const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
   const {
     data: publications = [],
     isLoading,
-    error,
-  } = usePublicationsQuery(author);
+    isError,
+  } = usePublicationsQuery(authorId);
+
   const [visibleCount, setVisibleCount] = useState(5); // Number of publications to display initially
 
   if (isLoading) {
@@ -22,7 +23,7 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ author }) => {
     );
   }
 
-  if (error) {
+  if (isError) {
     return (
       <Typography variant="body1" color="error">
         Failed to load publications.
@@ -33,7 +34,7 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ author }) => {
   if (publications.length === 0) {
     return (
       <Typography variant="body1" color="textSecondary">
-        No publications available for {author}.
+        No publications available for this author.
       </Typography>
     );
   }
@@ -45,41 +46,46 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ author }) => {
 
   return (
     <Box>
-      {publications
-        .slice(0, visibleCount)
-        .map((publication: any, index: number) => (
-          <Box
-            key={index}
-            sx={{
-              padding: 2,
-              marginBottom: 2,
-              border: "1px solid #ddd",
-              borderRadius: 2,
-              backgroundColor: "#f9f9f9",
-            }}
-          >
-            <Typography variant="h6">{publication.info.title}</Typography>
-            <Typography variant="body2" color="textSecondary">
-              {Array.isArray(publication.info.authors.author)
-                ? publication.info.authors.author
-                    .map((author: any) => author.text)
-                    .join(", ")
-                : publication.info.authors.author?.text || "Unknown Authors"}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Venue: {publication.info.venue || "Unknown Venue"}
-            </Typography>
-            <Typography variant="body2" color="primary">
-              <a
-                href={publication.info.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View Publication
-              </a>
-            </Typography>
-          </Box>
-        ))}
+      {publications.slice(0, visibleCount).map((publication, index) => (
+        <Box
+          key={index}
+          sx={{
+            padding: 2,
+            marginBottom: 2,
+            border: "1px solid #ddd",
+            borderRadius: 2,
+            backgroundColor: "#f9f9f9",
+          }}
+        >
+          {/* Title */}
+          <Typography variant="h6" gutterBottom>
+            {publication.title || "Untitled Publication"}
+          </Typography>
+
+          {/* Authors */}
+          <Typography variant="body2" color="textSecondary" gutterBottom>
+            {publication.authors.length > 0
+              ? publication.authors.map((author) => author.name).join(", ")
+              : "Unknown Authors"}
+          </Typography>
+
+          {/* Year */}
+          <Typography variant="body2" color="textSecondary" gutterBottom>
+            Year: {publication.year || "Unknown Year"}
+          </Typography>
+
+          {/* URL */}
+          <Typography variant="body2" color="primary">
+            <a
+              href={publication.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View Publication
+            </a>
+          </Typography>
+        </Box>
+      ))}
 
       {/* Load More Button */}
       {visibleCount < publications.length && (

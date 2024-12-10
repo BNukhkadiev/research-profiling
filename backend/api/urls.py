@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import DBLPSearchView, DBLPPublicationSearchView
+from .views import AuthorDetailsView, SemanticScholarSearchView, PublicationSearchView
 
 urlpatterns = [
-    path('dblp-search/', DBLPSearchView.as_view(), name='dblp-search'),
-    path('dblp-publication-search/', DBLPPublicationSearchView.as_view(), name='dblp-publication-search'),
+    path('sem-scholar-search/', SemanticScholarSearchView.as_view(), name='sem-scholar-search'),
+    path('sem-scholar-publication-search/', PublicationSearchView.as_view(), name='sem-scholar-publication-search'),
+    path('author-details/', AuthorDetailsView.as_view(), name='author-details'),
 ]

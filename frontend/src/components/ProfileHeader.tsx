@@ -7,8 +7,8 @@ import PeopleIcon from "@mui/icons-material/People";
 
 interface ProfileHeaderProps {
   author: string;
-  profileUrl: string;
-  affiliations: string;
+  profileUrl?: string; // Profile URL is optional
+  affiliations?: string; // Affiliations are optional
   addToCompare: () => void;
   isSelected: boolean;
 }
@@ -36,7 +36,10 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       {/* Left Section */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
         <img
-          src={profileUrl}
+          src={
+            profileUrl ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(author)}&background=random`
+          } // Fallback to generated avatar
           alt={`${author}'s profile`}
           style={{
             width: "60px",
@@ -50,13 +53,25 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             {author}
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            {affiliations}
+            {affiliations || "Affiliations not available"}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, marginTop: 1 }}>
-            <EmailIcon sx={{ color: "#555", cursor: "pointer" }} />
-            <GitHubIcon sx={{ color: "#555", cursor: "pointer" }} />
-            <LinkedInIcon sx={{ color: "#555", cursor: "pointer" }} />
-            <PeopleIcon sx={{ color: "#555", cursor: "pointer" }} />
+            <EmailIcon
+              sx={{ color: "#555", cursor: "pointer" }}
+              titleAccess="Email"
+            />
+            <GitHubIcon
+              sx={{ color: "#555", cursor: "pointer" }}
+              titleAccess="GitHub"
+            />
+            <LinkedInIcon
+              sx={{ color: "#555", cursor: "pointer" }}
+              titleAccess="LinkedIn"
+            />
+            <PeopleIcon
+              sx={{ color: "#555", cursor: "pointer" }}
+              titleAccess="Social Profile"
+            />
           </Box>
         </Box>
       </Box>

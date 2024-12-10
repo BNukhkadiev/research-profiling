@@ -11,24 +11,15 @@ import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 
 // Define types for API response
 interface Researcher {
-  info: {
-    author: string;
-    notes?: {
-      note:
-        | { "@type": string; text: string }
-        | { "@type": string; text: string }[];
-    };
-    url: string;
-  };
+  name: string;
+  url: string;
 }
 
 interface Publication {
-  info: {
-    title: string;
-    authors: { author: { text: string } | { text: string }[] };
-    venue?: string;
-    url: string;
-  };
+  url: string;
+  title: string;
+  year: number;
+  authors: { name: string }[];
 }
 
 const SearchResultsPage: React.FC = () => {
@@ -45,7 +36,11 @@ const SearchResultsPage: React.FC = () => {
   const { data: researchers = [], isLoading: loadingResearchers } =
     useResearchersQuery(activeTab === "researchers" ? searchQuery : "");
   const { data: publications = [], isLoading: loadingPublications } =
-    usePublicationsQuery(activeTab === "publications" ? searchQuery : "");
+    usePublicationsQuery(
+      activeTab === "publications" && selectedResearchers.length
+        ? selectedResearchers[0]
+        : ""
+    ); // Fetch publications for the first selected researcher
 
   const handleSearch = () => {
     setSearchQuery(query);
@@ -60,8 +55,9 @@ const SearchResultsPage: React.FC = () => {
     );
   };
 
-  const handleViewProfile = (author: string, profileUrl: string) => {
-    navigate("/profile", { state: { author, profileUrl } });
+  const handleViewProfile = (authorName: string, profileUrl: string) => {
+    const authorId = profileUrl.split("/").pop(); // Extract the author ID from the URL
+    navigate(`/profile/${authorId}`, { state: { authorName, authorId } });
   };
 
   const handleGetToComparison = () => {
@@ -107,6 +103,7 @@ const SearchResultsPage: React.FC = () => {
         <Button
           variant={activeTab === "publications" ? "contained" : "outlined"}
           onClick={() => setActiveTab("publications")}
+          disabled={selectedResearchers.length === 0} // Disable if no researcher selected
         >
           Publications
         </Button>
@@ -133,47 +130,26 @@ const SearchResultsPage: React.FC = () => {
           {activeTab === "researchers"
             ? researchers.map((researcher: Researcher, index: number) => (
                 <SearchCard
-                  key={`${researcher.info.url}-${index}`} // Ensure unique keys
-                  name={researcher.info.author}
-                  affiliations={
-                    Array.isArray(researcher.info.notes?.note)
-                      ? researcher.info.notes.note.map((n: any) => n.text)
-                      : [
-                          researcher.info.notes?.note?.text ||
-                            "No affiliation available",
-                        ]
-                  }
-                  profileUrl={researcher.info.url}
-                  addToCompare={() =>
-                    handleAddToCompare(researcher.info.author)
-                  }
-                  isSelected={selectedResearchers.includes(
-                    researcher.info.author
-                  )}
+                  key={`${researcher.url}-${index}`} // Ensure unique keys
+                  name={researcher.name}
+                  affiliations={[]} // Semantic Scholar doesn't provide affiliations in this query
+                  profileUrl={researcher.url}
+                  addToCompare={() => handleAddToCompare(researcher.name)}
+                  isSelected={selectedResearchers.includes(researcher.name)}
                   onViewProfile={() =>
-                    handleViewProfile(
-                      researcher.info.author,
-                      researcher.info.url
-                    )
+                    handleViewProfile(researcher.name, researcher.url)
                   }
                 />
               ))
-            : publications.map((publication: any, index: number) => {
-                // Process authors
-                const authors = Array.isArray(publication.info.authors.author)
-                  ? publication.info.authors.author
-                  : [publication.info.authors.author];
-
-                return (
-                  <PublicationCard
-                    key={`${publication.info.url}-${index}`} // Ensure unique keys
-                    title={publication.info.title}
-                    authors={authors} // Pass processed authors
-                    venue={publication.info.venue || "Unknown Venue"}
-                    url={publication.info.url}
-                  />
-                );
-              })}
+            : publications.map((publication: Publication, index: number) => (
+                <PublicationCard
+                  key={`${publication.url}-${index}`} // Ensure unique keys
+                  title={publication.title}
+                  authors={publication.authors.map((author) => author.name)} // Flatten authors
+                  venue={publication.year.toString()}
+                  url={publication.url}
+                />
+              ))}
         </Box>
       )}
     </Box>

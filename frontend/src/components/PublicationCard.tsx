@@ -4,9 +4,9 @@ import Typography from "@mui/material/Typography";
 
 interface PublicationCardProps {
   title: string;
-  authors: { text: string }[]; // Array of authors with a text field
-  venue: string;
-  url: string;
+  authors: string[]; // Array of author names as strings
+  venue: string; // Year or publication venue
+  url: string; // URL for the publication
 }
 
 const PublicationCard: React.FC<PublicationCardProps> = ({
@@ -15,8 +15,8 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
   venue,
   url,
 }) => {
-  // Format authors into a single string
-  const formattedAuthors = authors.map((author) => author.text).join(", ");
+  // Format authors into a single string or a fallback if empty
+  const formattedAuthors = authors.length > 0 ? authors.join(", ") : "Unknown Authors";
 
   return (
     <Box
@@ -30,7 +30,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
     >
       {/* Title */}
       <Typography variant="h6" gutterBottom>
-        {title}
+        {title || "Untitled Publication"}
       </Typography>
 
       {/* Authors */}
@@ -40,7 +40,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
 
       {/* Venue */}
       <Typography variant="body2" gutterBottom>
-        {`Venue: ${venue}`}
+        {`Year: ${venue || "Unknown Year"}`}
       </Typography>
 
       {/* URL */}
