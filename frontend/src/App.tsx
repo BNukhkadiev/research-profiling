@@ -6,12 +6,14 @@ import SearchResultsPage from "./pages/SearchResultsPage";
 import "./app.css"; // Import the CSS file
 import ResearcherProfilePage from "./pages/ResearcherProfilePage";
 import CompareResearchersPage from "./pages/CompareResearchersPage";
+import LoginPage from "./pages/LoginPage";
 
 function App() {
   return (
     <Router>
       <Header />
       <Routes>
+      <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchResultsPage />} />{" "}
         <Route path="/profile" element={<ResearcherProfilePage />} />
