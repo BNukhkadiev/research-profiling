@@ -1,0 +1,9 @@
+-- Create table for repositories
+CREATE TABLE repositories (
+    id SERIAL PRIMARY KEY,
+    researcher_id INT,
+    name VARCHAR(255) NOT NULL,
+    stars INT,
+    url VARCHAR(255),
+    FOREIGN KEY (researcher_id) REFERENCES researchers(id)
+);
