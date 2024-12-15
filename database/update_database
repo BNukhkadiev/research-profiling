@@ -1,0 +1,47 @@
+import requests
+from background_task import background
+from django.utils.dateparse import parse_date
+from .models import Researcher, Publication
+
+@background(schedule=60)  # Schedule for 1 minute after it's triggered, for example
+def update_database():
+    base_url = "https://dblp.org/search"
+    
+    # Example queries - these should be adapted or parameterized as needed
+    researcher_query = "Jane Doe"
+    publication_query = "Machine Learning"
+
+    # Fetch Researchers
+    researcher_url = f"{base_url}/author/api?q={researcher_query}&format=json"
+    response = requests.get(researcher_url)
+    if response.status_code == 200:
+        data = response.json()
+        for hit in data.get('result', {}).get('hits', {}).get('hit', []):
+            info = hit.get('info', {})
+            Researcher.objects.update_or_create(
+                name=info.get('author'),
+                defaults={
+                    'photo': '',  # Assuming you have a way to fetch this or it's manually added later
+                    'position': 'Researcher',  # This would need to be dynamically determined or updated
+                }
+            )
+
+    # Fetch Publications
+    publication_url = f"{base_url}/publ/api?q={publication_query}&format=json"
+    response = requests.get(publication_url)
+    if response.status_code == 200:
+        data = response.json()
+        for hit in data.get('result', {}).get('hits', {}).get('hit', []):
+            info = hit.get('info', {})
+            researcher, created = Researcher.objects.get_or_create(name=info.get('author'))
+            Publication.objects.update_or_create(
+                title=info.get('title'),
+                researcher=researcher,
+                defaults={
+                    'date': parse_date(info.get('year')),
+                    'venue': info.get('venue'),
+                    'core_ranking': '',  # Assume you have a way to determine this
+                    'topic': info.get('type'),  # Assuming 'type' is a proxy for topic
+                    'citations': 0,  # Assume initial zero or fetched from another source
+                }
+            )
