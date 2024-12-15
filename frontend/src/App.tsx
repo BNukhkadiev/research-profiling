@@ -7,6 +7,7 @@ import "./app.css"; // Import the CSS file
 import ResearcherProfilePage from "./pages/ResearcherProfilePage";
 import CompareResearchersPage from "./pages/CompareResearchersPage";
 import LoginPage from "./pages/LoginPage";
+import LogoutPage from "./pages/LogoutPage"; // Import the LogoutPage
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <Header />
       <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/logout" element={<LogoutPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchResultsPage />} />{" "}
         <Route path="/profile" element={<ResearcherProfilePage />} />

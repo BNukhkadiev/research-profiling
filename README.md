@@ -20,3 +20,4 @@ pip install -r requirements.txt
 ```
 
 Apply migrations via `python manage.py migrate`, then start via `python manage.py runserver`.
+create a superuser via `python manage.py createsuperuser`.
