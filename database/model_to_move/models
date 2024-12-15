@@ -1,0 +1,18 @@
+from django.db import models
+
+class Researcher(models.Model):
+    name = models.CharField(max_length=255)
+    photo = models.CharField(max_length=255, blank=True, null=True)
+    position = models.CharField(max_length=255, blank=True, null=True)
+    papers = models.IntegerField(default=0)
+    h_index = models.IntegerField(default=0)
+    citations = models.IntegerField(default=0)
+
+class Publication(models.Model):
+    researcher = models.ForeignKey(Researcher, on_delete=models.CASCADE, related_name='publications')
+    title = models.CharField(max_length=255)
+    date = models.DateField()
+    venue = models.CharField(max_length=255)
+    core_ranking = models.CharField(max_length=10)
+    topic = models.CharField(max_length=255)
+    citations = models.IntegerField(default=0)
