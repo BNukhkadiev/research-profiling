@@ -125,3 +125,51 @@ class LoginView(APIView):
             return Response(
                 {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
             )
+from rest_framework.permissions import AllowAny
+class SignupView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        
+        first_name = request.data.get("first_name")
+        last_name = request.data.get("last_name")
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        
+        if not first_name or not last_name or not email or not password:
+            
+            return Response(
+                {"error": "All fields are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        
+        if User.objects.filter(email=email).exists():
+            
+            return Response(
+                {"error": "A user with this email already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        
+        try:
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+            )
+            user.save()
+        except Exception as e:
+            
+            return Response(
+                {"error": "An error occurred while creating the user: " + str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        
+        return Response(
+            {"message": "User created successfully."},
+            status=status.HTTP_201_CREATED,
+        )
