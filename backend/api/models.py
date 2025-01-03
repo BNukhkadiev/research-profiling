@@ -50,3 +50,18 @@ class Repository(models.Model):
 
     def __str__(self):
         return f"{self.name} (⭐ {self.stars})"
+
+class Venue(models.Model):
+    name = models.CharField(max_length=255)
+    core_ranking = models.CharField(max_length=10, null=True, blank=True)  # e.g., A, B, C.
+
+    def __str__(self):
+        return self.name
+    
+   
+    class Coauthor(models.Model):
+        researcher = models.ForeignKey(Researcher, on_delete=models.CASCADE, related_name="coauthors")
+        coauthor = models.ForeignKey(Researcher, on_delete=models.CASCADE, related_name="coauthored_with")
+    def __str__(self):
+        return f"{self.researcher.name} - {self.coauthor.name}"
+
