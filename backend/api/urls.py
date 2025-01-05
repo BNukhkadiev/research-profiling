@@ -10,5 +10,5 @@ urlpatterns = [
     path('dblp-publication-search/', DBLPPublicationSearchView.as_view(), name='dblp-publication-search'),
     path('login/', LoginView.as_view(), name="login"),
     path("signup/", SignupView.as_view(), name="signup"),
-     path("api/researchers/<int:researcher_id>/affiliations/", ResearcherAffiliationsAPIView.as_view(), name="researcher_affiliations"),
+    path("researchers/<int:researcher_id>/affiliations/", ResearcherAffiliationsAPIView.as_view(), name="researcher_affiliations"),
 ]
