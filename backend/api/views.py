@@ -13,6 +13,30 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.status import HTTP_404_NOT_FOUND
+from .models import Researcher
+
+class ResearcherAffiliationsAPIView(APIView):
+    def get(self, request, researcher_id):
+        try:
+            researcher = Researcher.objects.get(id=researcher_id)
+        except Researcher.DoesNotExist:
+            return Response({"error": "Researcher not found"}, status=HTTP_404_NOT_FOUND)
+
+        affiliations = researcher.affiliations.order_by("start_year")
+        data = [
+            {
+                "institution": affiliation.institution,
+                "start_year": affiliation.start_year,
+                "end_year": affiliation.end_year,
+                "position": affiliation.position,
+            }
+            for affiliation in affiliations
+        ]
+        return Response({"name": researcher.name, "affiliations": data})
+
 
 # Set up logging
 logger = logging.getLogger(__name__)
