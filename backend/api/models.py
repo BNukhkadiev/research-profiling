@@ -14,6 +14,16 @@ class Researcher(models.Model):
     def __str__(self):
         return self.name
 
+class Affiliation(models.Model):
+    researcher = models.ForeignKey(Researcher, on_delete=models.CASCADE, related_name="affiliations")
+    institution = models.CharField(max_length=255)
+    start_year = models.IntegerField()
+    end_year = models.IntegerField(null=True, blank=True)  # Null for ongoing affiliations
+    position = models.CharField(max_length=255, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.researcher.name} at {self.institution}"
+
 # Award Model
 class Award(models.Model):
     researcher = models.ForeignKey(
@@ -64,4 +74,3 @@ class Venue(models.Model):
         coauthor = models.ForeignKey(Researcher, on_delete=models.CASCADE, related_name="coauthored_with")
     def __str__(self):
         return f"{self.researcher.name} - {self.coauthor.name}"
-
