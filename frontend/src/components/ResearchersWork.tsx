@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Tabs, Tab, Box, Typography } from "@mui/material";
 import PublicationsList from "./PublicationsList";
 
-const ResearchersWork: React.FC<{ author: string }> = ({ author }) => {
+const ResearchersWork: React.FC<{ author: string; filters: any }> = ({ author, filters }) => {
   const [activeTab, setActiveTab] = useState("publications");
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
@@ -45,7 +45,7 @@ const ResearchersWork: React.FC<{ author: string }> = ({ author }) => {
             >
               Publications by {author}
             </Typography>
-            <PublicationsList author={author} />
+            <PublicationsList author={author} filters={filters} />
           </>
         )}
         {activeTab === "repositories" && (

@@ -16,11 +16,10 @@ const ResearcherProfilePage: React.FC = () => {
   const { state } = location;
   const { author, profileUrl, affiliations } = state || {};
 
-  const [activeFilters, setActiveFilters] = useState({});
+  const [filters, setFilters] = useState({});
 
-  const handleFilterChange = (filters: any) => {
-    setActiveFilters(filters);
-    console.log("Active Filters:", filters);
+  const handleFilterChange = (newFilters: any) => {
+    setFilters(newFilters); // Update the filters state when filters change
   };
 
   if (!author || !profileUrl) {
@@ -65,7 +64,7 @@ const ResearcherProfilePage: React.FC = () => {
 
         {/* Middle Column */}
         <Box sx={{ width: "50%" }}>
-          <ResearchersWork author={author} />
+          <ResearchersWork author={author} filters={filters} />
         </Box>
 
         {/* Right Column */}

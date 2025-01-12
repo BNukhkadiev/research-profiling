@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Button, Chip, Menu, MenuItem } from "@mui/material";
 import { DateRangePicker } from "react-date-range";
-import "react-date-range/dist/styles.css"; // main style file
-import "react-date-range/dist/theme/default.css"; // theme css file
+import "react-date-range/dist/styles.css";
+import "react-date-range/dist/theme/default.css";
 
 interface FiltersProps {
   onFilterChange: (filters: any) => void;
@@ -10,13 +10,13 @@ interface FiltersProps {
 
 const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
   const [filters, setFilters] = useState<{
-    date: string | null;
-    venue: string[];
+    dateRange: { startDate: Date; endDate: Date } | null;
+    venues: string[];
     coreRanking: string | null;
     sort: string | null;
   }>({
-    date: null,
-    venue: [],
+    dateRange: null,
+    venues: [],
     coreRanking: null,
     sort: null,
   });
@@ -35,33 +35,34 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
     useState<null | HTMLElement>(null);
   const [anchorElSort, setAnchorElSort] = useState<null | HTMLElement>(null);
 
-  const toggleDatePicker = () => {
-    setShowDatePicker((prev) => !prev);
-  };
+  useEffect(() => {
+    onFilterChange(filters);
+  }, [filters, onFilterChange]);
 
   const handleDateChange = (ranges: any) => {
     setDateRange([ranges.selection]);
     setFilters((prev) => ({
       ...prev,
-      date: `${ranges.selection.startDate.toLocaleDateString()} - ${ranges.selection.endDate.toLocaleDateString()}`,
+      dateRange: {
+        startDate: new Date(ranges.selection.startDate),
+        endDate: new Date(ranges.selection.endDate),
+      },
     }));
     setShowDatePicker(false);
-    onFilterChange(filters);
   };
 
   const handleSelectFilter = (type: string, value: string) => {
     setFilters((prev) => ({
       ...prev,
-      [type]: type === "venue" ? [...prev.venue, value] : value,
+      [type]: type === "venues" ? [...prev.venues, value] : value,
     }));
-    onFilterChange(filters);
   };
 
   const handleRemoveFilter = (type: string, value?: string) => {
-    if (type === "venue") {
+    if (type === "venues") {
       setFilters((prev) => ({
         ...prev,
-        venue: prev.venue.filter((v) => v !== value),
+        venues: prev.venues.filter((v) => v !== value),
       }));
     } else {
       setFilters((prev) => ({
@@ -69,19 +70,22 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
         [type]: null,
       }));
     }
-    onFilterChange(filters);
   };
 
   const handleClearAll = () => {
-    setFilters({ date: null, venue: [], coreRanking: null, sort: null });
-    onFilterChange(filters);
+    setFilters({
+      dateRange: null,
+      venues: [],
+      coreRanking: null,
+      sort: null,
+    });
   };
 
   return (
     <Box>
       {/* Filter Buttons */}
       <Box sx={{ display: "flex", gap: 2, marginBottom: 2 }}>
-        <Button variant="outlined" onClick={toggleDatePicker}>
+        <Button variant="outlined" onClick={() => setShowDatePicker((prev) => !prev)}>
           Date
         </Button>
         <Button
@@ -104,17 +108,39 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
         </Button>
       </Box>
 
+      {/* Date Picker */}
+      {showDatePicker && (
+        <Box sx={{ marginBottom: 2 }}>
+          <DateRangePicker
+            ranges={dateRange}
+            onChange={handleDateChange}
+            moveRangeOnFirstSelection={false}
+          />
+        </Box>
+      )}
+
       {/* Venue Menu */}
       <Menu
         anchorEl={anchorElVenue}
         open={Boolean(anchorElVenue)}
         onClose={() => setAnchorElVenue(null)}
       >
-        {["ICML 2024", "SIGGRAPH", "CHI", "Nature"].map((venue) => (
+        {[
+          "ACM SIGKDD",
+          "IEEE ICMLA",
+          "AAAI Conference",
+          "NeurIPS",
+          "ICML",
+          "CHI",
+          "SIGGRAPH",
+          "Nature",
+          "Science",
+          "Stat. Comput.",
+        ].map((venue) => (
           <MenuItem
             key={venue}
             onClick={() => {
-              handleSelectFilter("venue", venue);
+              handleSelectFilter("venues", venue);
               setAnchorElVenue(null);
             }}
           >
@@ -129,7 +155,7 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
         open={Boolean(anchorElCoreRanking)}
         onClose={() => setAnchorElCoreRanking(null)}
       >
-        {["A*", "A", "B", "C", "Australasian B"].map((ranking) => (
+        {["A*", "A", "B", "C"].map((ranking) => (
           <MenuItem
             key={ranking}
             onClick={() => {
@@ -161,30 +187,19 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
         ))}
       </Menu>
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        <Box sx={{ marginBottom: 2 }}>
-          <DateRangePicker
-            ranges={dateRange}
-            onChange={handleDateChange}
-            moveRangeOnFirstSelection={false}
-          />
-        </Box>
-      )}
-
       {/* Active Filters */}
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", marginBottom: 2 }}>
-        {filters.date && (
+        {filters.dateRange && (
           <Chip
-            label={`Date: ${filters.date}`}
-            onDelete={() => handleRemoveFilter("date")}
+            label={`Date: ${filters.dateRange.startDate.toDateString()} - ${filters.dateRange.endDate.toDateString()}`}
+            onDelete={() => handleRemoveFilter("dateRange")}
           />
         )}
-        {filters.venue.map((v) => (
+        {filters.venues.map((v) => (
           <Chip
             key={v}
             label={`Venue: ${v}`}
-            onDelete={() => handleRemoveFilter("venue", v)}
+            onDelete={() => handleRemoveFilter("venues", v)}
           />
         ))}
         {filters.coreRanking && (
@@ -199,10 +214,7 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
             onDelete={() => handleRemoveFilter("sort")}
           />
         )}
-        {(filters.date ||
-          filters.venue.length ||
-          filters.coreRanking ||
-          filters.sort) && (
+        {(filters.dateRange || filters.venues.length || filters.coreRanking || filters.sort) && (
           <Button onClick={handleClearAll} color="secondary">
             Clear All
           </Button>
