@@ -122,6 +122,8 @@ class SemanticScholarSearchView(APIView):
             logger.error(f"Error querying APIs: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
 #########
 class PublicationSearchView(APIView):
     permission_classes = [AllowAny]
@@ -234,7 +236,7 @@ class PaperDetailsView(APIView):
     """
     Handles retrieval of paper details using Semantic Scholar.
     """
-
+    # Integrate keywords here. 
     def get(self, request):
         # Get the paper ID from the query parameter
         paper_id = request.GET.get('paper_id', '')
