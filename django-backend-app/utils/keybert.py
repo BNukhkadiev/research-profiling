@@ -23,3 +23,4 @@ class KeywordExtractor:
                                        keyphrase_ngram_range=keyphrase_ngram_range, 
                                        use_mmr=use_mmr, stop_words=stop_words, diversity=diversity)
         return self.keywords
+    

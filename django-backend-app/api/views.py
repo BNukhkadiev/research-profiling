@@ -10,6 +10,7 @@ from rest_framework.authtoken.models import Token  # For token-based auth
 from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
 import xml.etree.ElementTree as ET
+from utils.LLM import generate_abstract
 import string
 import difflib
 
@@ -305,27 +306,6 @@ class ResearcherThumbnailView(APIView):
             logger.error(f"Error fetching DBLP XML for author {search_query}: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-
-# Placeholder for LLM-based abstract generation
-def generate_abstract(publications):
-    """
-    Generate a short researcher description based on their publications.
-    :param publications: List of tuples [(title, venue), ...]
-    :return: Generated abstract string
-    """
-    if not publications:
-        return "No available publication data to generate an abstract."
-
-    # Construct prompt
-    prompt = "Generate a short description of a researcher based on their publications:\n"
-    for title, venue in publications:
-        prompt += f"- {title} (Published in {venue})\n"
-
-    # Simulate an LLM call (replace with actual LLM inference)
-    abstract = f"This researcher has contributed to topics including {', '.join(set([v for _, v in publications]))}."
-    abstract = "Some abstract here"
-    return abstract
 
 
 class DBLPSearchView(APIView):
