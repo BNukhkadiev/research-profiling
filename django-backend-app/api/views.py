@@ -278,3 +278,126 @@ class PaperDetailsView(APIView):
         except requests.exceptions.RequestException as e:
             logger.error(f"Error while calling Semantic Scholar API: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ResearcherThumbnailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        search_query = request.GET.get('query', '')
+        logger.info(f"Received author search request with query: {search_query}")
+
+        if not search_query:
+            return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try: 
+            dblp_url = f"https://dblp.org/search/author/api?q={search_query}&format=json"
+            logger.info(f"Querying DBLP API: {dblp_url}")
+            dblp_response = requests.get(dblp_url)
+            dblp_response.raise_for_status()
+            dblp_data = dblp_response.json()
+
+            # Return the transformed response
+            logger.info(f"Successfully fetched and formatted {len(formatted_publications)} publications.")
+            return Response({"publications": formatted_publications}, status=status.HTTP_200_OK)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching DBLP XML for author {search_query}: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+# Placeholder for LLM-based abstract generation
+def generate_abstract(publications):
+    """
+    Generate a short researcher description based on their publications.
+    :param publications: List of tuples [(title, venue), ...]
+    :return: Generated abstract string
+    """
+    if not publications:
+        return "No available publication data to generate an abstract."
+
+    # Construct prompt
+    prompt = "Generate a short description of a researcher based on their publications:\n"
+    for title, venue in publications:
+        prompt += f"- {title} (Published in {venue})\n"
+
+    # Simulate an LLM call (replace with actual LLM inference)
+    abstract = f"This researcher has contributed to topics including {', '.join(set([v for _, v in publications]))}."
+    abstract = "Some abstract here"
+    return abstract
+
+
+class DBLPSearchView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        search_query = request.GET.get('query', '').strip()
+        logger.info(f"Received author search request with query: {search_query}")
+
+        if not search_query:
+            return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Query DBLP API for author search
+            dblp_url = f"https://dblp.org/search/author/api?q={search_query}&format=json"
+            logger.info(f"Querying DBLP API: {dblp_url}")
+            dblp_response = requests.get(dblp_url)
+            dblp_response.raise_for_status()
+            dblp_data = dblp_response.json()
+
+            # Check if any authors were found
+            if not dblp_data.get("result", {}).get("hits", {}).get("hit"):
+                logger.warning("No authors found in DBLP.")
+                return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
+
+            authors_list = []
+            dblp_authors = dblp_data["result"]["hits"]["hit"]
+
+            # Process each matched author
+            for dblp_author in dblp_authors:
+                author_info = dblp_author.get("info", {})
+                author_name = author_info.get("author")
+                author_url = author_info.get("url")
+
+                if not author_url:
+                    continue  # Skip authors with missing DBLP profile links
+
+                # Fetch detailed DBLP XML using author PID
+                author_pid_url = f"{author_url}.xml"
+                logger.info(f"Fetching DBLP XML from {author_pid_url}")
+                author_profile_response = requests.get(author_pid_url)
+                author_profile_response.raise_for_status()
+                root = ET.fromstring(author_profile_response.text)
+
+                # Extract affiliations
+                affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
+
+                # Extract publications
+                publications = []
+                for pub in root.findall(".//r"):
+                    publ_info = pub.find("./*")  # Finds first child element (can be article or inproceedings)
+                    if publ_info is not None:
+                        title = publ_info.findtext("title", "").strip()
+                        venue = publ_info.findtext("booktitle") or publ_info.findtext("journal", "Unknown Venue")
+                        if title:
+                            publications.append((title, venue))
+
+                # Generate LLM-based abstract
+                abstract = generate_abstract(publications)
+
+                # Append author data to list
+                authors_list.append({
+                    "name": author_name,
+                    "affiliations": affiliations,
+                    "dblp_url": author_url,
+                    "abstract": abstract
+                })
+
+            return Response({"authors": authors_list}, status=status.HTTP_200_OK)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error querying DBLP API: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ET.ParseError as e:
+            logger.error(f"Error parsing DBLP XML: {e}")
+            return Response({"error": "Failed to parse DBLP XML."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
