@@ -4,7 +4,8 @@ import { Box, Typography, Button, Tooltip } from "@mui/material";
 interface SearchCardProps {
   name: string;
   affiliations: string[];
-  profileUrl: string;
+  dblp_url: string;
+  abstract: string;
   addToCompare: () => void;
   isSelected: boolean;
   onViewProfile: () => void; // Prop for navigation
@@ -13,7 +14,8 @@ interface SearchCardProps {
 const SearchCard: React.FC<SearchCardProps> = ({
   name,
   affiliations,
-  profileUrl,
+  dblp_url,
+  abstract,
   addToCompare,
   isSelected,
   onViewProfile,
@@ -41,6 +43,7 @@ const SearchCard: React.FC<SearchCardProps> = ({
       >
         {name}
       </Typography>
+
       <Tooltip
         title={affiliations.length > 0 ? affiliations.join(", ") : "No affiliations available"}
         placement="bottom-start"
@@ -51,17 +54,31 @@ const SearchCard: React.FC<SearchCardProps> = ({
           color="textSecondary"
           sx={{
             marginTop: 1,
-            wordWrap: "break-word", // Ensure long affiliations don't overflow
-            maxHeight: "4.5rem", // Limit displayed affiliations
+            wordWrap: "break-word",
+            maxHeight: "4.5rem",
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}
         >
-          {affiliations.length > 0
-            ? affiliations.join(", ")
-            : "No affiliations available"}
+          {affiliations.length > 0 ? affiliations.join(", ") : "No affiliations available"}
         </Typography>
       </Tooltip>
+
+      {/* Researcher abstract */}
+      <Typography
+        variant="body2"
+        color="textPrimary"
+        sx={{
+          marginTop: 1.5,
+          fontStyle: "italic",
+          maxHeight: "4.5rem",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {abstract}
+      </Typography>
+
       <Box
         sx={{
           display: "flex",
@@ -72,7 +89,9 @@ const SearchCard: React.FC<SearchCardProps> = ({
       >
         <Button
           variant="outlined"
-          onClick={onViewProfile}
+          href={dblp_url}
+          target="_blank"
+          rel="noopener noreferrer"
           sx={{ textTransform: "none" }}
         >
           View Profile
