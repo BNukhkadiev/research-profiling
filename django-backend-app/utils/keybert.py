@@ -19,8 +19,8 @@ class KeywordExtractor:
 
 
     def extract_keywords(self, doc:str, keyphrase_ngram_range=(2,3), use_mmr=True, stop_words='english', diversity=0.2):
-        self.kw_model.extract_keywords(doc, 
+        keywords = self.kw_model.extract_keywords(doc, 
                                        keyphrase_ngram_range=keyphrase_ngram_range, 
                                        use_mmr=use_mmr, stop_words=stop_words, diversity=diversity)
-        return self.keywords
+        return keywords
     

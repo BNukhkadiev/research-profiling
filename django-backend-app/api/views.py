@@ -11,9 +11,13 @@ from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
 import xml.etree.ElementTree as ET
 from utils.LLM import generate_abstract
+from utils.keybert import KeywordExtractor
 import string
 import difflib
+import urllib.parse
 
+
+extractor = KeywordExtractor()
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -122,7 +126,6 @@ class SemanticScholarSearchView(APIView):
         except requests.exceptions.RequestException as e:
             logger.error(f"Error querying APIs: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 #########
@@ -307,7 +310,6 @@ class ResearcherThumbnailView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 class DBLPSearchView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
@@ -381,3 +383,214 @@ class DBLPSearchView(APIView):
         except ET.ParseError as e:
             logger.error(f"Error parsing DBLP XML: {e}")
             return Response({"error": "Failed to parse DBLP XML."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+
+
+# class ResearcherProfileView(APIView):
+
+#     permission_classes = [AllowAny]
+
+#     def get(self, request, pid):
+#         """Fetch and return researcher profile from DBLP XML using the given PID."""
+#         decoded_pid = urllib.parse.unquote(pid)  # Decode PID (in case it's URL-encoded)
+#         dblp_url = f"https://dblp.org/pid/{decoded_pid}.xml"
+
+#         try:
+#             response = requests.get(dblp_url)
+#             response.raise_for_status()
+#             root = ET.fromstring(response.text)
+
+#             name = root.get("name", "Unknown Researcher")
+#             affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
+
+#             publications = []
+#             venues = set()
+#             coauthors = set()
+
+#             for pub in root.findall(".//r"):
+#                 publ_info = pub.find("./*")
+#                 if publ_info is not None:
+#                     title = publ_info.findtext("title", "").strip()
+#                     year = int(publ_info.findtext("year", "0"))
+
+#                     # Determine publication type
+#                     if publ_info.tag == "inproceedings":
+#                         paper_type = "Conference Paper"
+#                         venue = publ_info.findtext("booktitle", "Unknown Conference")
+#                     elif publ_info.tag == "article":
+#                         paper_type = "Journal Article"
+#                         venue = publ_info.findtext("journal", "Unknown Journal")
+#                     elif publ_info.tag == "phdthesis":
+#                         paper_type = "PhD Thesis"
+#                         venue = "PhD Dissertation"
+#                     elif publ_info.tag == "mastersthesis":
+#                         paper_type = "Masters Thesis"
+#                         venue = "Masters Dissertation"
+#                     else:
+#                         paper_type = "Other"
+
+#                     venues.add(venue)
+
+#                     # Extract authors
+#                     paper_authors = [
+#                         {"name": author.text, "pid": author.get("pid", "")}
+#                         for author in publ_info.findall("author")
+#                     ]
+#                     coauthors.update([a["name"] for a in paper_authors if a["name"] != name])
+
+#                     # Extract links
+#                     links = [ee.text for ee in publ_info.findall("ee")]
+
+#                     # Extract topics using KeywordExtractor
+#                     abstract = ""  # DBLP doesn't provide abstracts
+#                     topics = KeywordExtractor.extract_keywords(abstract)
+
+#                     # Placeholder for citations
+#                     citations = 0  
+
+#                     publications.append({
+#                         "title": title,
+#                         "year": year,
+#                         "type": paper_type,
+#                         "venue": venue,
+#                         "citations": citations,
+#                         "topics": topics,
+#                         "authors": paper_authors,
+#                         "links": links
+#                     })
+
+#             # Convert venues to list format
+#             venue_list = [{"name": v, "CORE_rank": "Unknown"} for v in venues]
+
+#             return Response({
+#                 "name": name,
+#                 "affiliations": affiliations,
+#                 "h-index": 0,  # Placeholder
+#                 "g-index": 0,  # Placeholder
+#                 "total_papers": len(publications),
+#                 "total_citations": 0,  # Placeholder
+#                 "venues": venue_list,
+#                 "topics": [],  # Topics can be aggregated later
+#                 "papers": publications,
+#                 "coauthors": list(coauthors),
+#             }, status=status.HTTP_200_OK)
+
+#         except requests.exceptions.RequestException as e:
+#             logger.error(f"Error fetching DBLP XML: {e}")
+#             return Response({"error": "Failed to fetch DBLP data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         except ET.ParseError as e:
+#             logger.error(f"Error parsing DBLP XML: {e}")
+#             return Response({"error": "Error parsing DBLP XML."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class ResearcherProfileView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        pid = request.GET.get('pid', '').strip()
+        pid = urllib.parse.unquote(pid)
+        logger.info(f"Received author details request with pid: {pid}")
+
+        if not pid:
+            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            dblp_url = f'https://dblp.org/pid/{pid}.xml'
+            logger.info(f"Querying DBLP API: {dblp_url}")
+            dblp_response = requests.get(dblp_url)
+            dblp_response.raise_for_status()
+
+            if not dblp_response.text.strip():  # Handle empty responses
+                logger.error(f"DBLP returned an empty response for PID: {pid}")
+                return Response({"error": "DBLP returned an empty response. PID may not exist."},
+                                status=status.HTTP_404_NOT_FOUND)
+
+            root = ET.fromstring(dblp_response.text)
+
+            name = root.get("name", "Unknown Researcher")
+            affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
+
+            publications = []
+            venue_counts = {}  # Dictionary to count occurrences of each venue
+            coauthors_dict = {}  # Dictionary to ensure unique coauthors with their PIDs
+
+            for pub in root.findall(".//r"):
+                publ_info = pub.find("./*")
+                if publ_info is not None:
+                    title = publ_info.findtext("title", "").strip()
+                    year = int(publ_info.findtext("year", "0") or 0)
+
+                    # Determine publication type
+                    if publ_info.tag == "inproceedings":
+                        paper_type = "Conference Paper"
+                        venue = publ_info.findtext("booktitle", "Unknown Conference")
+                    elif publ_info.tag == "article":
+                        paper_type = "Journal Article"
+                        venue = publ_info.findtext("journal", "Unknown Journal")
+                    elif publ_info.tag == "phdthesis":
+                        paper_type = "PhD Thesis"
+                        venue = "PhD Dissertation"
+                    elif publ_info.tag == "mastersthesis":
+                        paper_type = "Masters Thesis"
+                        venue = "Masters Dissertation"
+                    else:
+                        paper_type = "Other"
+
+                    # Count venue occurrences
+                    venue_counts[venue] = venue_counts.get(venue, 0) + 1
+
+                    # Extract authors
+                    paper_authors = []
+                    for author in publ_info.findall("author"):
+                        author_name = author.text
+                        author_pid = author.get("pid", "")
+                        paper_authors.append({"name": author_name, "pid": author_pid})
+
+                        # Add to coauthors list, excluding the main researcher
+                        if author_name != name:
+                            coauthors_dict[author_name] = author_pid
+
+                    # Extract links
+                    links = [ee.text for ee in publ_info.findall("ee")]
+
+                    # Extract topics using KeywordExtractor
+                    abstract = "Some abstract about paper here"  # DBLP doesn't provide abstracts
+                    raw_topics = extractor.extract_keywords(doc=abstract)
+                    topics = [topic[0] for topic in raw_topics]  # Extract only topic names
+
+                    # Placeholder for citations
+                    citations = 0  
+
+                    publications.append({
+                        "title": title,
+                        "year": year,
+                        "type": paper_type,
+                        "venue": venue,
+                        "citations": citations,
+                        "topics": topics,
+                        "authors": paper_authors,
+                        "links": links
+                    })
+
+            # Convert venue counts to the required format
+            venue_list = [{venue: count} for venue, count in venue_counts.items()]
+
+            # Convert coauthors dictionary to a list of dictionaries
+            coauthors_list = [{"name": name, "pid": pid} for name, pid in coauthors_dict.items()]
+
+            return Response({
+                "name": name,
+                "affiliations": affiliations,
+                "h-index": 0,  # Placeholder
+                "g-index": 0,  # Placeholder
+                "total_papers": len(publications),
+                "total_citations": 0,  # Placeholder
+                "venues": venue_list,
+                "topics": [],  # Topics can be aggregated later
+                "papers": publications,
+                "coauthors": coauthors_list,
+            }, status=status.HTTP_200_OK)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error querying DBLP API: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
