@@ -77,6 +77,10 @@ const ResearcherProfilePage: React.FC = () => {
     }
   }, [researcherProfile]);
 
+  useEffect(() => {
+    console.log("Fetched researcher profile:", researcherProfile);
+  }, [researcherProfile]);
+  
   // Function to fetch ranking data (replace with actual logic if available)
   const getVenueRanking = (venue: string): string | undefined => {
     const rankings = {
@@ -122,12 +126,12 @@ const ResearcherProfilePage: React.FC = () => {
     );
   }
 
-  // Prepare statistics for StatisticsCard
+  // ✅ **Prepare statistics for `StatisticsCard`**
   const statistics = {
-    papers: researcherProfile?.totalPapers || 0,
-    citations: researcherProfile?.totalCitations || 0,
-    hIndex: researcherProfile?.hIndex || 0,
-    gIndex: researcherProfile?.gIndex || 0,
+    papers: researcherProfile?.totalPapers ?? null,  // ✅ Don't default to `0`
+    citations: researcherProfile?.totalCitations ?? null,
+    hIndex: researcherProfile?.hIndex ?? null,
+    gIndex: researcherProfile?.gIndex ?? null,
   };
 
   return (
@@ -169,7 +173,7 @@ const ResearcherProfilePage: React.FC = () => {
           <ResearchersWork
             author={researcherProfile?.name || ""}
             authorId={pid}
-            publications={publications} // Pass publications directly
+            publications={publications} // ✅ Pass publications directly (Avoids unnecessary queries in `ResearchersWork`)
           />
         </Box>
 
@@ -182,7 +186,7 @@ const ResearcherProfilePage: React.FC = () => {
             gap: 2,
           }}
         >
-          <StatisticsCard author={statistics} />
+          <StatisticsCard author={statistics} /> {/* ✅ Pass `StatisticsCard` correct statistics data */}
           <CoauthorsSection coauthors={coauthors} />
         </Box>
       </Box>

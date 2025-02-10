@@ -30,7 +30,17 @@ const fetchResearcherProfile = async (pid: string): Promise<ResearcherProfileRes
 
   try {
     const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?pid=${encodedPid}`);
-    return response.data;
+
+    const data = response.data;
+
+    // ✅ Map backend fields (snake_case) to frontend fields (camelCase)
+    return {
+      ...data,
+      hIndex: data['h-index'],
+      gIndex: data['g-index'],
+      totalPapers: data.total_papers,
+      totalCitations: data.total_citations,
+    };
   } catch (error: any) {
     console.error(`❌ Error fetching researcher profile for PID: ${pid}`, error);
     throw error.response?.data || new Error("Failed to fetch researcher profile.");

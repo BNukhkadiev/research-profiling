@@ -9,19 +9,19 @@ import InsightsIcon from "@mui/icons-material/Insights"; // Icon for statistics
 
 interface StatisticsCardProps {
   author: {
-    papers: number;
-    citations: number;
-    hIndex: number;
-    gIndex: number;
+    papers?: number;
+    citations?: number;
+    hIndex?: number;
+    gIndex?: number;
   };
 }
 
 const StatisticsCard: React.FC<StatisticsCardProps> = ({ author }) => {
   const stats = [
-    { label: "#Papers", value: author.papers },
-    { label: "#Citations", value: author.citations },
-    { label: "H-Index", value: author.hIndex },
-    { label: "G-Index", value: author.gIndex },
+    { label: "Total Papers", value: author.papers ?? "N/A" },
+    { label: "Total Citations", value: author.citations ?? "N/A" },
+    { label: "H-Index", value: author.hIndex ?? "N/A" },
+    { label: "G-Index", value: author.gIndex ?? "N/A" },
   ];
 
   return (
@@ -29,7 +29,7 @@ const StatisticsCard: React.FC<StatisticsCardProps> = ({ author }) => {
       sx={{
         padding: 3,
         borderRadius: "8px",
-        backgroundColor: "#FFFF", // Light background
+        backgroundColor: "#FFF", // Light background
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -45,12 +45,13 @@ const StatisticsCard: React.FC<StatisticsCardProps> = ({ author }) => {
       </Typography>
       <List>
         {stats.map((stat, index) => (
-          <ListItem key={index} sx={{ padding: 0 }}>
+          <ListItem key={index} sx={{ padding: "6px 0" }}>
             <ListItemIcon>
-              <InsightsIcon sx={{ color: "#1976d2" }} /> {/* Icon color */}
+              <InsightsIcon sx={{ color: "#1976d2" }} />
             </ListItemIcon>
             <ListItemText
-              primary={`${stat.label}: ${stat.value}`}
+              primary={stat.label}
+              secondary={stat.value.toString()}
               sx={{ color: "#555" }}
             />
           </ListItem>
