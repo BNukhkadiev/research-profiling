@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 interface Coauthor {
   name: string;
   pid: string;
+  publicationsTogether: number;
 }
 
 interface CoauthorsSectionProps {
@@ -17,10 +18,10 @@ interface CoauthorsSectionProps {
 }
 
 const CoauthorsSection: React.FC<CoauthorsSectionProps> = ({ coauthors }) => {
-  const [visibleCount, setVisibleCount] = useState(5); // Number of coauthors to display initially
+  const [visibleCount, setVisibleCount] = useState(5);
 
   const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5); // Increment by 5
+    setVisibleCount((prevCount) => prevCount + 5);
   };
 
   return (
@@ -28,7 +29,7 @@ const CoauthorsSection: React.FC<CoauthorsSectionProps> = ({ coauthors }) => {
       sx={{
         padding: 3,
         borderRadius: "8px",
-        backgroundColor: "#FFF", // Light background
+        backgroundColor: "#FFF",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -38,20 +39,20 @@ const CoauthorsSection: React.FC<CoauthorsSectionProps> = ({ coauthors }) => {
       <List>
         {coauthors.length > 0 ? (
           coauthors.slice(0, visibleCount).map((coauthor) => {
-            const encodedPid = encodeURIComponent(coauthor.pid); // Encode PID for safe URL
+            const encodedPid = encodeURIComponent(coauthor.pid);
             return (
               <ListItem key={coauthor.pid} sx={{ padding: "8px 0" }}>
                 <ListItemText
                   primary={
-                    <Link
-                      to={`/profile/${encodedPid}`} // Use encoded PID in the profile URL
-                      style={{
-                        color: "#1976d2",
-                        textDecoration: "none",
-                      }}
-                    >
-                      {coauthor.name}
-                    </Link>
+                    <>
+                      <Link
+                        to={`/profile/${encodedPid}`}
+                        style={{ color: "#1976d2", textDecoration: "none" }}
+                      >
+                        {coauthor.name}
+                      </Link>
+                      {" "}- {coauthor.publicationsTogether} papers
+                    </>
                   }
                 />
               </ListItem>

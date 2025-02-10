@@ -21,26 +21,25 @@ interface VenueData {
 interface Coauthor {
   name: string;
   pid: string;
+  publicationsTogether: number;
 }
 
 const ResearcherProfilePage: React.FC = () => {
   const { pid } = useParams<{ pid: string }>();
-  const encodedPid = pid ? encodeURIComponent(pid) : ""; // Ensure proper encoding
+  const encodedPid = pid ? encodeURIComponent(pid) : "";
 
   const [activeFilters, setActiveFilters] = useState({});
   const [venues, setVenues] = useState<VenueData[]>([]);
   const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
   const [topics, setTopics] = useState<{ [key: string]: number }[]>([]);
-  const [publications, setPublications] = useState([]); // Store publications here
+  const [publications, setPublications] = useState([]);
 
-  // Fetch researcher profile
   const {
     data: researcherProfile,
     isLoading: loadingProfile,
     isError: errorProfile,
   } = useResearcherProfileQuery(encodedPid);
 
-  // Extract venues and compute counts/rankings
   useEffect(() => {
     if (researcherProfile?.venues) {
       const venueData: VenueData[] = researcherProfile.venues.map((venue) => {
@@ -51,37 +50,28 @@ const ResearcherProfilePage: React.FC = () => {
           ranking: getVenueRanking(venueName),
         };
       });
-
       setVenues(venueData);
     }
   }, [researcherProfile]);
 
-  // Extract coauthors
   useEffect(() => {
     if (researcherProfile?.coauthors) {
       setCoauthors(researcherProfile.coauthors);
     }
   }, [researcherProfile]);
 
-  // Extract topics
   useEffect(() => {
     if (researcherProfile?.topics) {
       setTopics(researcherProfile.topics);
     }
   }, [researcherProfile]);
 
-  // Extract publications
   useEffect(() => {
     if (researcherProfile?.papers) {
       setPublications(researcherProfile.papers);
     }
   }, [researcherProfile]);
 
-  useEffect(() => {
-    console.log("Fetched researcher profile:", researcherProfile);
-  }, [researcherProfile]);
-  
-  // Function to fetch ranking data (replace with actual logic if available)
   const getVenueRanking = (venue: string): string | undefined => {
     const rankings = {
       ICML: "A*",
@@ -116,7 +106,6 @@ const ResearcherProfilePage: React.FC = () => {
 
   if (errorProfile) {
     console.error("Error fetching researcher profile:", errorProfile);
-
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4" color="error">
@@ -126,9 +115,8 @@ const ResearcherProfilePage: React.FC = () => {
     );
   }
 
-  // ✅ **Prepare statistics for `StatisticsCard`**
   const statistics = {
-    papers: researcherProfile?.totalPapers ?? null,  // ✅ Don't default to `0`
+    papers: researcherProfile?.totalPapers ?? null,
     citations: researcherProfile?.totalCitations ?? null,
     hIndex: researcherProfile?.hIndex ?? null,
     gIndex: researcherProfile?.gIndex ?? null,
@@ -136,57 +124,29 @@ const ResearcherProfilePage: React.FC = () => {
 
   return (
     <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
-      {/* Filters */}
       <Filters onFilterChange={handleFilterChange} />
-
-      {/* Profile Header */}
       <ProfileHeader
         author={researcherProfile?.name || "Unknown Author"}
-        profileUrl={`https://dblp.org/pid/${pid}`} // Construct DBLP profile URL
+        profileUrl={`https://dblp.org/pid/${pid}`}
         affiliations={
           researcherProfile?.affiliations?.join(", ") || "Affiliations not available"
         }
         addToCompare={() =>
           console.log(`Add to Compare Clicked for ${researcherProfile?.name}`)
         }
-        isSelected={false} // Example: Update state if dynamic selection is needed
+        isSelected={false}
       />
-
-      {/* Main Layout */}
       <Box sx={{ display: "flex", gap: 4, marginTop: 4 }}>
-        {/* Left Column */}
-        <Box
-          sx={{
-            width: "25%",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
+        <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <AwardsCard />
           <VenuesCard venues={venues} />
           <CommonTopicsCard topics={topics} />
         </Box>
-
-        {/* Middle Column */}
         <Box sx={{ width: "50%" }}>
-          <ResearchersWork
-            author={researcherProfile?.name || ""}
-            authorId={pid}
-            publications={publications} // ✅ Pass publications directly (Avoids unnecessary queries in `ResearchersWork`)
-          />
+          <ResearchersWork author={researcherProfile?.name || ""} authorId={pid} publications={publications} />
         </Box>
-
-        {/* Right Column */}
-        <Box
-          sx={{
-            width: "25%",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
-          <StatisticsCard author={statistics} /> {/* ✅ Pass `StatisticsCard` correct statistics data */}
+        <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
+          <StatisticsCard author={statistics} />
           <CoauthorsSection coauthors={coauthors} />
         </Box>
       </Box>

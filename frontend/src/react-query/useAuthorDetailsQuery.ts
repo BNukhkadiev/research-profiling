@@ -21,7 +21,7 @@ interface ResearcherProfileResponse {
     authors: { name: string; pid: string }[];
     links: string[];
   }[];
-  coauthors: { name: string; pid: string }[];
+  coauthors: { name: string; pid: string; publicationsTogether: number }[];
 }
 
 // Fetch function for researcher profile
@@ -40,6 +40,11 @@ const fetchResearcherProfile = async (pid: string): Promise<ResearcherProfileRes
       gIndex: data['g-index'],
       totalPapers: data.total_papers,
       totalCitations: data.total_citations,
+      coauthors: data.coauthors.map((coauthor: any) => ({
+        name: coauthor.name,
+        pid: coauthor.pid,
+        publicationsTogether: coauthor.publications_together,
+      })),
     };
   } catch (error: any) {
     console.error(`❌ Error fetching researcher profile for PID: ${pid}`, error);

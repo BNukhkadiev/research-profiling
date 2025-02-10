@@ -16,7 +16,7 @@ from utils.abstracts import get_abstract_from_openalex
 import string
 import difflib
 import urllib.parse
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 extractor = KeywordExtractor()
@@ -394,9 +394,9 @@ class DBLPSearchView(APIView):
 
 
 
-
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
+    
     def get(self, request):
         pid = request.GET.get('pid', '').strip()
         pid = urllib.parse.unquote(pid)
@@ -404,13 +404,14 @@ class ResearcherProfileView(APIView):
 
         if not pid:
             return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             dblp_url = f'https://dblp.org/pid/{pid}.xml'
             logger.info(f"Querying DBLP API: {dblp_url}")
             dblp_response = requests.get(dblp_url)
             dblp_response.raise_for_status()
 
-            if not dblp_response.text.strip():  # Handle empty responses
+            if not dblp_response.text.strip():
                 logger.error(f"DBLP returned an empty response for PID: {pid}")
                 return Response({"error": "DBLP returned an empty response. PID may not exist."},
                                 status=status.HTTP_404_NOT_FOUND)
@@ -421,8 +422,9 @@ class ResearcherProfileView(APIView):
             affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
 
             publications = []
-            venue_counts = {}  # Dictionary to count occurrences of each venue
-            coauthors_dict = {}  # Dictionary to ensure unique coauthors with their PIDs
+            venue_counts = {}  # Count occurrences of each venue
+            coauthors_dict = defaultdict(int)  # Store coauthor names with count of coauthored papers
+            coauthor_pids = {}  # Store PID of coauthors
             topic_counts = Counter()
 
             for pub in root.findall(".//r"):
@@ -457,44 +459,42 @@ class ResearcherProfileView(APIView):
                         author_pid = author.get("pid", "")
                         paper_authors.append({"name": author_name, "pid": author_pid})
 
-                        # Add to coauthors list, excluding the main researcher
+                        # Track coauthor count, excluding the main researcher
                         if author_name != name:
-                            coauthors_dict[author_name] = author_pid
+                            coauthors_dict[author_name] += 1
+                            coauthor_pids[author_name] = author_pid
 
                     # Extract links
                     links = [ee.text for ee in publ_info.findall("ee")]
 
                     # Extract topics using KeywordExtractor
-                    # abstract = get_abstract_from_openalex(title=title)  # DBLP doesn't provide abstracts
                     abstract = "Some abstract here bla bla bla bla "
                     raw_topics = extractor.extract_keywords(doc=abstract)
-                    topics = [topic[0] for topic in raw_topics]  # Extract only topic names
+                    topics = [topic[0] for topic in raw_topics]
 
-                    # Count topics globally
                     topic_counts.update(topics)
-
-                    # Placeholder for citations
-                    citations = 0  
 
                     publications.append({
                         "title": title,
                         "year": year,
                         "type": paper_type,
                         "venue": venue,
-                        "citations": citations,
+                        "citations": 0,  # Placeholder
                         "topics": topics,
                         "authors": paper_authors,
                         "links": links
                     })
 
-            # Convert venue counts to the required format
+            # Convert venue counts to required format
             venue_list = [{venue: count} for venue, count in sorted(venue_counts.items(), key=lambda x: x[1], reverse=True)]
-            
-            # Convert topics counts to sorted list (descending order)
             topics_list = [{topic: count} for topic, count in topic_counts.most_common()]
 
-            # Convert coauthors dictionary to a list of dictionaries
-            coauthors_list = [{"name": name, "pid": pid} for name, pid in coauthors_dict.items()]
+            # Convert coauthors dictionary to list with coauthored publication count
+            coauthors_list = sorted(
+                [{"name": name, "pid": coauthor_pids.get(name, ""), "publications_together": count}
+                for name, count in coauthors_dict.items()],
+                key=lambda x: x["publications_together"], reverse=True
+            )
 
             return Response({
                 "name": name,
@@ -504,7 +504,7 @@ class ResearcherProfileView(APIView):
                 "total_papers": len(publications),
                 "total_citations": 1000,  # Placeholder
                 "venues": venue_list,
-                "topics": topics_list,  # Topics can be aggregated later
+                "topics": topics_list,
                 "papers": publications,
                 "coauthors": coauthors_list,
             }, status=status.HTTP_200_OK)

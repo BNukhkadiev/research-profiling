@@ -11,10 +11,11 @@ import { Typography } from "@mui/material";
 interface Coauthor {
   name: string;
   pid: string;
+  publicationsTogether: number;
 }
 
 interface CoauthorsListProps {
-  coauthors: Coauthor[]; // Accept an array of coauthors as props
+  coauthors: Coauthor[];
 }
 
 const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
@@ -23,7 +24,7 @@ const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
       sx={{
         padding: 3,
         borderRadius: "8px",
-        backgroundColor: "#FFF", // Light background
+        backgroundColor: "#FFF",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -36,7 +37,7 @@ const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
       <List>
         {coauthors.length > 0 ? (
           coauthors.map((coauthor, index) => {
-            const encodedPid = encodeURIComponent(coauthor.pid); // Encode PID to handle slashes
+            const encodedPid = encodeURIComponent(coauthor.pid);
             return (
               <ListItem key={index} sx={{ padding: "8px 0" }}>
                 <ListItemIcon>
@@ -44,12 +45,15 @@ const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
                 </ListItemIcon>
                 <ListItemText
                   primary={
-                    <Link
-                      to={`/profile/${encodedPid}`} // Use encoded PID in the profile URL
-                      style={{ textDecoration: "none", color: "#1976d2" }}
-                    >
-                      {coauthor.name}
-                    </Link>
+                    <>
+                      <Link
+                        to={`/profile/${encodedPid}`}
+                        style={{ textDecoration: "none", color: "#1976d2" }}
+                      >
+                        {coauthor.name}
+                      </Link>
+                      {" "}- {coauthor.publicationsTogether} papers
+                    </>
                   }
                 />
               </ListItem>
