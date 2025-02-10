@@ -1,42 +1,40 @@
 import requests
-import xml.etree.ElementTree as ET
 
+def get_researcher_description(name, paper_titles):
+    url = "http://localhost:11434/api/generate"
 
+    # Format the list of paper titles as a readable string
+    papers_str = "; ".join(paper_titles) if paper_titles else "No published papers listed"
 
-def reconstruct_abstract(inverted_index):
-    """
-    Converts OpenAlex's inverted index format into a readable plain text abstract.
-    """
-    if not inverted_index:
-        return "No abstract available"
+    prompt = (
+        f"Generate a concise 2 sentence researcher description using the follownig information. "
+        f"Name: {name}"
+        f"Notable papers: {papers_str}. "
+        f"Summarize the research focus, contributions, and impact."
+        f"Directly return the profile without introductions, disclaimers, or extra formatting."
+    )
 
-    # Create a list to store words in their correct positions
-    max_index = max(max(positions) for positions in inverted_index.values())
-    abstract_words = [""] * (max_index + 1)
-
-    for word, positions in inverted_index.items():
-        for pos in positions:
-            abstract_words[pos] = word
-
-    return " ".join(abstract_words)
-
-
-def get_abstract_from_openalex(title):
-    """
-    Fetches paper abstract from OpenAlex by title and converts it to plain text.
-    """
-    base_url = "https://api.openalex.org/works"
-    params = {"search": title, "per_page": 1}
-    response = requests.get(base_url, params=params)
-
+    payload = {
+        "model": "gemma:2b",  # Make sure you are using the optimized model
+        "prompt": prompt,
+        "stream": False
+    }
+    
+    response = requests.post(url, json=payload)
+    
     if response.status_code == 200:
-        data = response.json()
-        if "results" in data and len(data["results"]) > 0:
-            paper = data["results"][0]
-            inverted_index = paper.get("abstract_inverted_index", {})
-            return reconstruct_abstract(inverted_index)
-
-    return "Abstract not found"
+        return response.json()["response"]
+    else:
+        return f"Error: {response.text}"
 
 
-print(get_abstract_from_openalex('Attention is All you need'))
+# Example usage
+description = get_researcher_description(
+    name="Heiko Paulheim",
+    paper_titles=[
+        "Knowledge Graphs",
+        "Graph-based Learning for Scientific Discovery",
+    ]
+)
+
+print(description)
