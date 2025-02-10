@@ -13,7 +13,7 @@ def get_researcher_description(name, paper_titles):
         f"Name: {name}"
         f"Notable papers: {papers_str}. "
         f"Summarize the research focus, contributions, and impact of this specific researcher."
-        f"Directly return the profile without introductions, disclaimers, or extra formatting."
+        f"Directly return the description without introductions, disclaimers, or extra formatting."
     )
 
     payload = {
