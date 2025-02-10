@@ -31,6 +31,7 @@ const ResearcherProfilePage: React.FC = () => {
   const [venues, setVenues] = useState<VenueData[]>([]);
   const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
   const [topics, setTopics] = useState<{ [key: string]: number }[]>([]);
+  const [publications, setPublications] = useState([]); // Store publications here
 
   // Fetch researcher profile
   const {
@@ -66,6 +67,13 @@ const ResearcherProfilePage: React.FC = () => {
   useEffect(() => {
     if (researcherProfile?.topics) {
       setTopics(researcherProfile.topics);
+    }
+  }, [researcherProfile]);
+
+  // Extract publications
+  useEffect(() => {
+    if (researcherProfile?.papers) {
+      setPublications(researcherProfile.papers);
     }
   }, [researcherProfile]);
 
@@ -161,7 +169,7 @@ const ResearcherProfilePage: React.FC = () => {
           <ResearchersWork
             author={researcherProfile?.name || ""}
             authorId={pid}
-            filters={activeFilters}
+            publications={publications} // Pass publications directly
           />
         </Box>
 

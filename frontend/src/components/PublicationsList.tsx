@@ -1,37 +1,23 @@
 import React, { useState } from "react";
 import { Box, Typography, Button } from "@mui/material";
-import { useNavigate } from "react-router-dom"; // Import useNavigate for navigation
-import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
+import { useNavigate } from "react-router-dom";
 
 interface PublicationsListProps {
-  authorId: string;
+  publications: {
+    title: string;
+    year: number;
+    type: string;
+    venue: string;
+    citations: number;
+    topics: string[];
+    authors: { name: string; pid: string }[];
+    links: string[];
+  }[];
 }
 
-const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
-  const navigate = useNavigate(); // Initialize navigate
-  const {
-    data: publications = [],
-    isLoading,
-    isError,
-  } = usePublicationsQuery(authorId);
-
-  const [visibleCount, setVisibleCount] = useState(5); // Number of publications to display initially
-
-  if (isLoading) {
-    return (
-      <Typography variant="body1" color="textSecondary">
-        Loading publications...
-      </Typography>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Typography variant="body1" color="error">
-        Failed to load publications.
-      </Typography>
-    );
-  }
+const PublicationsList: React.FC<PublicationsListProps> = ({ publications }) => {
+  const navigate = useNavigate();
+  const [visibleCount, setVisibleCount] = useState(5); // Show 5 publications initially
 
   if (publications.length === 0) {
     return (
@@ -43,11 +29,12 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
 
   // Increment the number of visible publications
   const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5); // Load 5 more publications
+    setVisibleCount((prevCount) => prevCount + 5);
   };
 
-  // Handle navigation to the PublicationDetails page
-  const handleViewDetails = (publicationId: string) => {
+  // Handle navigation to the publication details page
+  const handleViewDetails = (publicationUrl: string) => {
+    const publicationId = publicationUrl.split("/").pop() || "";
     navigate(`/publication/${publicationId}`);
   };
 
@@ -76,34 +63,36 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
               : "Unknown Authors"}
           </Typography>
 
-          {/* Year */}
+          {/* Venue & Year */}
           <Typography variant="body2" color="textSecondary" gutterBottom>
-            Year: {publication.year || "Unknown Year"}
+            {`Venue: ${publication.venue || "Unknown Venue"} | Year: ${publication.year || "Unknown"}`}
           </Typography>
 
           {/* Citation Count */}
-          {publication.citationCount !== undefined && (
+          {publication.citations !== undefined && (
             <Typography variant="body2" color="textSecondary" gutterBottom>
-              Citations: {publication.citationCount}
+              Citations: {publication.citations}
             </Typography>
           )}
 
-          {/* Fields of Study */}
-          {publication.fieldsOfStudy && publication.fieldsOfStudy.length > 0 && (
+          {/* Topics */}
+          {publication.topics.length > 0 && (
             <Typography variant="body2" color="textSecondary" gutterBottom>
-              Fields of Study: {publication.fieldsOfStudy.join(", ")}
+              Topics: {publication.topics.join(", ")}
             </Typography>
           )}
 
           {/* View Details Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleViewDetails(publication.url.split("/").pop() || "")}
-            sx={{ textTransform: "none", marginTop: 1 }}
-          >
-            View Details
-          </Button>
+          {publication.links.length > 0 && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => handleViewDetails(publication.links[0])}
+              sx={{ textTransform: "none", marginTop: 1 }}
+            >
+              View Details
+            </Button>
+          )}
         </Box>
       ))}
 

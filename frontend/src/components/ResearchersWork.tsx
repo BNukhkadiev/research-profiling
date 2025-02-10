@@ -1,17 +1,24 @@
 import React, { useState } from "react";
 import { Tabs, Tab, Box, Typography } from "@mui/material";
 import PublicationsList from "./PublicationsList";
-import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 
 interface ResearchersWorkProps {
   author: string;
   authorId: string;
+  publications: {
+    title: string;
+    year: number;
+    type: string;
+    venue: string;
+    citations: number;
+    topics: string[];
+    authors: { name: string; pid: string }[];
+    links: string[];
+  }[];
 }
 
-const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId }) => {
+const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, publications }) => {
   const [activeTab, setActiveTab] = useState("publications");
-
-  const { data: publications = [], isLoading, isError } = usePublicationsQuery(authorId);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
     setActiveTab(newValue);
@@ -48,20 +55,11 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId }) =
         {/* Publications Tab */}
         {activeTab === "publications" && (
           <>
-            <Typography
-              variant="h6"
-              sx={{ marginBottom: 2, fontWeight: "bold" }}
-            >
+            <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
               Publications by {author}
             </Typography>
-            {isLoading ? (
-              <Typography variant="body2">Loading publications...</Typography>
-            ) : isError ? (
-              <Typography variant="body2" color="error">
-                Error fetching publications. Please try again later.
-              </Typography>
-            ) : publications.length > 0 ? (
-              <PublicationsList authorId={authorId} />
+            {publications.length > 0 ? (
+              <PublicationsList publications={publications} />
             ) : (
               <Typography variant="body2" color="textSecondary">
                 No publications found for {author}.

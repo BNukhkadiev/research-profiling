@@ -1,15 +1,18 @@
 import React from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import Link from "@mui/material/Link";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
 
 interface PublicationCardProps {
   title: string;
-  authors: string[]; // Array of author names as strings
-  venue: string; // Publication venue or year
-  url: string; // URL for the publication
-  abstract?: string; // Abstract of the publication (optional)
+  authors: { name: string; pid: string }[]; // Array of authors with name and PID
+  venue: string; // Venue name
+  url?: string; // Primary publication URL
+  links?: string[]; // Additional links
   citationCount?: number; // Citation count (optional)
-  fieldsOfStudy?: string[]; // Fields of study (optional)
+  topics?: string[]; // Topics extracted from the publication
 }
 
 const PublicationCard: React.FC<PublicationCardProps> = ({
@@ -17,12 +20,23 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
   authors,
   venue,
   url,
-  abstract,
+  links = [],
   citationCount,
-  fieldsOfStudy,
+  topics,
 }) => {
-  // Format authors into a single string or a fallback if empty
-  const formattedAuthors = authors.length > 0 ? authors.join(", ") : "Unknown Authors";
+  // Format authors into clickable links
+  const formattedAuthors = authors.length > 0 ? (
+    authors.map((author, index) => (
+      <React.Fragment key={author.pid}>
+        <Link href={`/profile/${encodeURIComponent(author.pid)}`} style={{ textDecoration: "none" }}>
+          {author.name}
+        </Link>
+        {index < authors.length - 1 && ", "}
+      </React.Fragment>
+    ))
+  ) : (
+    "Unknown Authors"
+  );
 
   return (
     <Box
@@ -41,20 +55,13 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
 
       {/* Authors */}
       <Typography variant="body2" color="textSecondary" gutterBottom>
-        {`Authors: ${formattedAuthors}`}
+        {`Authors: `} {formattedAuthors}
       </Typography>
 
       {/* Venue */}
       <Typography variant="body2" color="textSecondary" gutterBottom>
         {`Venue: ${venue || "Unknown Venue"}`}
       </Typography>
-
-      {/* Abstract */}
-      {abstract && (
-        <Typography variant="body2" gutterBottom>
-          {`Abstract: ${abstract}`}
-        </Typography>
-      )}
 
       {/* Citation Count */}
       {citationCount !== undefined && (
@@ -63,19 +70,34 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
         </Typography>
       )}
 
-      {/* Fields of Study */}
-      {fieldsOfStudy && fieldsOfStudy.length > 0 && (
+      {/* Topics */}
+      {topics && topics.length > 0 && (
         <Typography variant="body2" color="textSecondary" gutterBottom>
-          {`Fields of Study: ${fieldsOfStudy.join(", ")}`}
+          {`Topics: ${topics.join(", ")}`}
         </Typography>
       )}
 
-      {/* URL */}
-      <Typography variant="body2">
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          View Publication
-        </a>
-      </Typography>
+      {/* Links */}
+      {links.length > 0 && (
+        <List dense>
+          {links.map((link, index) => (
+            <ListItem key={index} sx={{ padding: 0 }}>
+              <Link href={link} target="_blank" rel="noopener noreferrer">
+                View Publication {index + 1}
+              </Link>
+            </ListItem>
+          ))}
+        </List>
+      )}
+
+      {/* Primary URL */}
+      {url && links.length === 0 && (
+        <Typography variant="body2">
+          <Link href={url} target="_blank" rel="noopener noreferrer">
+            View Publication
+          </Link>
+        </Typography>
+      )}
     </Box>
   );
 };
