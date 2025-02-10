@@ -1,25 +1,30 @@
 import React from "react";
 import { Box, Typography, Button, Tooltip } from "@mui/material";
+import { Link } from "react-router-dom";
 
 interface SearchCardProps {
   name: string;
   affiliations: string[];
+  pid: string;
   dblp_url: string;
   abstract: string;
   addToCompare: () => void;
   isSelected: boolean;
-  onViewProfile: () => void; // Prop for navigation
+  onViewProfile: () => void; // Function to navigate to profile page
 }
 
 const SearchCard: React.FC<SearchCardProps> = ({
   name,
   affiliations,
+  pid,
   dblp_url,
   abstract,
   addToCompare,
   isSelected,
   onViewProfile,
 }) => {
+  const encodedPid = encodeURIComponent(pid); // Encode PID properly for URL
+
   return (
     <Box
       sx={{
@@ -87,6 +92,17 @@ const SearchCard: React.FC<SearchCardProps> = ({
           marginTop: 2,
         }}
       >
+        {/* Navigate to Researcher Profile Page */}
+        <Button
+          variant="outlined"
+          component={Link}
+          to={`/profile/${encodedPid}`} // Navigate to researcher profile
+          sx={{ textTransform: "none" }}
+        >
+          View Profile
+        </Button>
+
+        {/* Open DBLP Profile */}
         <Button
           variant="outlined"
           href={dblp_url}
@@ -94,8 +110,9 @@ const SearchCard: React.FC<SearchCardProps> = ({
           rel="noopener noreferrer"
           sx={{ textTransform: "none" }}
         >
-          View Profile
+          View on DBLP
         </Button>
+
         <Button
           variant="contained"
           onClick={addToCompare}

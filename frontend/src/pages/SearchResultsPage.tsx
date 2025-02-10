@@ -13,6 +13,7 @@ import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 interface Researcher {
   name: string;
   affiliations: string[];
+  pid: string;
   dblp_url: string;
   abstract: string;
 }
@@ -29,7 +30,7 @@ const SearchResultsPage: React.FC = () => {
   const navigate = useNavigate();
   const initialQuery = searchParams.get("query") || "";
   const [query, setQuery] = useState(initialQuery);
-  const [searchQuery, setSearchQuery] = useState(initialQuery); // Used for API calls
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState<"researchers" | "publications">("researchers");
   const [selectedResearchers, setSelectedResearchers] = useState<string[]>([]);
 
@@ -52,19 +53,15 @@ const SearchResultsPage: React.FC = () => {
   };
 
   // Add/remove researcher from comparison list
-  const handleAddToCompare = (author: string) => {
+  const handleAddToCompare = (pid: string) => {
     setSelectedResearchers((prev) =>
-      prev.includes(author) ? prev.filter((name) => name !== author) : [...prev, author]
+      prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid]
     );
   };
 
-  // Navigate to profile page
-  const handleViewProfile = (authorName: string, dblpUrl: string, affiliations: string[]) => {
-    const authorId = dblpUrl.split("/").pop(); // Extract author ID from DBLP URL
-    const affiliation = affiliations.length > 0 ? affiliations[0] : "Unknown";
-    navigate(`/profile/${authorId}/${encodeURIComponent(affiliation)}`, {
-      state: { authorName, authorId },
-    });
+  // Navigate to profile page using `pid`
+  const handleViewProfile = (pid: string) => {
+    navigate(`/profile/${encodeURIComponent(pid)}`);
   };
 
   // Navigate to comparison page
@@ -132,16 +129,17 @@ const SearchResultsPage: React.FC = () => {
       ) : (
         <Box>
           {activeTab === "researchers"
-            ? researchers.map((researcher: Researcher, index: number) => (
+            ? researchers.map((researcher: Researcher) => (
                 <SearchCard
-                  key={`${researcher.dblp_url}-${index}`} // Ensure unique keys
+                  key={researcher.pid} // Use PID as key
                   name={researcher.name}
                   affiliations={researcher.affiliations}
-                  dblp_url={researcher.dblp_url} // Use correct property
+                  pid={researcher.pid} // Pass PID for profile navigation
+                  dblp_url={researcher.dblp_url} // Keep DBLP profile link
                   abstract={researcher.abstract} // Pass abstract
-                  addToCompare={() => handleAddToCompare(researcher.name)}
-                  isSelected={selectedResearchers.includes(researcher.name)}
-                  onViewProfile={() => handleViewProfile(researcher.name, researcher.dblp_url, researcher.affiliations)}
+                  addToCompare={() => handleAddToCompare(researcher.pid)}
+                  isSelected={selectedResearchers.includes(researcher.pid)}
+                  onViewProfile={() => handleViewProfile(researcher.pid)} // Ensure navigation works
                 />
               ))
             : publications.map((publication: Publication, index: number) => (

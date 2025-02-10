@@ -1,34 +1,41 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
-// Define the types for the response
-interface AuthorDetailsResponse {
+// Define the types for the response based on our Django view
+interface ResearcherProfileResponse {
   name: string;
-  url: string;
   affiliations: string[];
-  paperCount: number;
   hIndex: number;
-  citationCount: number;
+  gIndex: number;
+  totalPapers: number;
+  totalCitations: number;
+  venues: Record<string, number>[];
+  topics: string[];
+  papers: {
+    title: string;
+    year: number;
+    type: string;
+    venue: string;
+    citations: number;
+    topics: string[];
+    authors: { name: string; pid: string }[];
+    links: string[];
+  }[];
+  coauthors: { name: string; pid: string }[];
 }
 
-const fetchAuthorDetails = async (
-  authorId: string,
-  affiliation: string
-): Promise<AuthorDetailsResponse> => {
-  const response = await axios.get("http://127.0.0.1:8000/api/author-details/", {
-    params: {
-      author_id: authorId, // Pass author_id as query parameter
-      affiliation: affiliation, // Pass affiliation as query parameter
-    },
-  });
+// Fetch function for researcher profile
+const fetchResearcherProfile = async (pid: string): Promise<ResearcherProfileResponse> => {
+  const encodedPid = encodeURIComponent(pid); // Encode PID to handle slashes
+  const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?pid=${encodedPid}`);
   return response.data;
 };
 
-// React Query hook for author details
-export const useAuthorDetailsQuery = (authorId: string, affiliation: string) => {
-  return useQuery<AuthorDetailsResponse>({
-    queryKey: ["authorDetails", authorId, affiliation], // Unique key based on author ID and affiliation
-    queryFn: () => fetchAuthorDetails(authorId, affiliation), // Fetching function
-    enabled: !!authorId, // Ensure the query runs only if authorId exists
+// React Query hook for researcher profile
+export const useResearcherProfileQuery = (pid: string) => {
+  return useQuery<ResearcherProfileResponse>({
+    queryKey: ["researcherProfile", pid], // Unique query key based on PID
+    queryFn: () => fetchResearcherProfile(pid), // Fetch function
+    enabled: !!pid, // Ensures query runs only if PID exists
   });
 };

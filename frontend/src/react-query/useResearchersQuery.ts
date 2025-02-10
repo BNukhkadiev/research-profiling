@@ -4,6 +4,7 @@ import axios from "axios";
 // Define the response type based on the updated API
 interface Author {
   name: string;
+  pid: string; // Include pid
   affiliations: string[];
   dblp_url: string;
   abstract: string;
@@ -15,7 +16,13 @@ const fetchResearchers = async (query: string): Promise<Author[]> => {
     params: { query },
   });
 
-  return response.data.authors || []; // Adjusted to correctly extract "authors"
+  return response.data.authors.map((author: any) => ({
+    name: author.name,
+    pid: author.pid, // Ensure pid is included
+    affiliations: author.affiliations,
+    dblp_url: author.dblp_url,
+    abstract: author.abstract,
+  })) || []; // Adjusted to correctly extract "authors"
 };
 
 // React Query hook for researchers

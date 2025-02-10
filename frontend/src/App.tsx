@@ -15,16 +15,9 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchResultsPage />} />
-        <Route
-          path="/profile/:authorId/:affiliation"
-          element={<ResearcherProfilePage />}
-        />
-        <Route
-          path="/compare-researchers"
-          element={<CompareResearchersPage />}
-        />
+        <Route path="/profile/:pid" element={<ResearcherProfilePage />} /> {/* Updated Route */}
+        <Route path="/compare-researchers" element={<CompareResearchersPage />} />
         <Route path="/publication/:publicationId" element={<PublicationDetailsPage />} />
-        {/* Added the route for PublicationDetailsPage */}
       </Routes>
     </Router>
   );
