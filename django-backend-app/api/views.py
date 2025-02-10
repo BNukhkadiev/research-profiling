@@ -12,6 +12,7 @@ from django.utils.decorators import method_decorator
 import xml.etree.ElementTree as ET
 from utils.LLM import generate_abstract
 from utils.keybert import KeywordExtractor
+from utils.abstracts import get_abstract_from_openalex
 import string
 import difflib
 import urllib.parse
@@ -392,6 +393,7 @@ class DBLPSearchView(APIView):
 
 
 
+
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
@@ -462,7 +464,7 @@ class ResearcherProfileView(APIView):
                     links = [ee.text for ee in publ_info.findall("ee")]
 
                     # Extract topics using KeywordExtractor
-                    abstract = "Some abstract about paper here"  # DBLP doesn't provide abstracts
+                    abstract = get_abstract_from_openalex(title=title)  # DBLP doesn't provide abstracts
                     raw_topics = extractor.extract_keywords(doc=abstract)
                     topics = [topic[0] for topic in raw_topics]  # Extract only topic names
 

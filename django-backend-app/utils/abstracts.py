@@ -1,6 +1,4 @@
 import requests
-import xml.etree.ElementTree as ET
-
 
 
 def reconstruct_abstract(inverted_index):
@@ -37,6 +35,3 @@ def get_abstract_from_openalex(title):
             return reconstruct_abstract(inverted_index)
 
     return "Abstract not found"
-
-
-print(get_abstract_from_openalex('Attention is All you need'))

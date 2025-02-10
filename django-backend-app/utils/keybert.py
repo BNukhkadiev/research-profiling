@@ -18,9 +18,9 @@ class KeywordExtractor:
         self.kw_model = KeyBERT()
 
 
-    def extract_keywords(self, doc:str, keyphrase_ngram_range=(2,3), use_mmr=True, stop_words='english', diversity=0.2):
+    def extract_keywords(self, doc:str, keyphrase_ngram_range=(2,3), use_mmr=True, stop_words='english', diversity=0.5):
         keywords = self.kw_model.extract_keywords(doc, 
                                        keyphrase_ngram_range=keyphrase_ngram_range, 
-                                       use_mmr=use_mmr, stop_words=stop_words, diversity=diversity)
+                                       use_mmr=use_mmr, stop_words=stop_words, diversity=diversity, top_n=2)
         return keywords
     
