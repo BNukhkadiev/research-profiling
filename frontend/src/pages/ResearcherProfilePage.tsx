@@ -30,6 +30,7 @@ const ResearcherProfilePage: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState({});
   const [venues, setVenues] = useState<VenueData[]>([]);
   const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
+  const [topics, setTopics] = useState<{ [key: string]: number }[]>([]);
 
   // Fetch researcher profile
   const {
@@ -58,6 +59,13 @@ const ResearcherProfilePage: React.FC = () => {
   useEffect(() => {
     if (researcherProfile?.coauthors) {
       setCoauthors(researcherProfile.coauthors);
+    }
+  }, [researcherProfile]);
+
+  // Extract topics
+  useEffect(() => {
+    if (researcherProfile?.topics) {
+      setTopics(researcherProfile.topics);
     }
   }, [researcherProfile]);
 
@@ -145,7 +153,7 @@ const ResearcherProfilePage: React.FC = () => {
         >
           <AwardsCard />
           <VenuesCard venues={venues} />
-          <CommonTopicsCard />
+          <CommonTopicsCard topics={topics} />
         </Box>
 
         {/* Middle Column */}

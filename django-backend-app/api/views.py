@@ -15,6 +15,7 @@ from utils.keybert import KeywordExtractor
 import string
 import difflib
 import urllib.parse
+from collections import Counter
 
 
 extractor = KeywordExtractor()
@@ -389,6 +390,8 @@ class DBLPSearchView(APIView):
             logger.error(f"Error parsing DBLP XML: {e}")
             return Response({"error": "Failed to parse DBLP XML."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
@@ -417,6 +420,7 @@ class ResearcherProfileView(APIView):
             publications = []
             venue_counts = {}  # Dictionary to count occurrences of each venue
             coauthors_dict = {}  # Dictionary to ensure unique coauthors with their PIDs
+            topic_counts = Counter()
 
             for pub in root.findall(".//r"):
                 publ_info = pub.find("./*")
@@ -462,6 +466,9 @@ class ResearcherProfileView(APIView):
                     raw_topics = extractor.extract_keywords(doc=abstract)
                     topics = [topic[0] for topic in raw_topics]  # Extract only topic names
 
+                    # Count topics globally
+                    topic_counts.update(topics)
+
                     # Placeholder for citations
                     citations = 0  
 
@@ -477,7 +484,10 @@ class ResearcherProfileView(APIView):
                     })
 
             # Convert venue counts to the required format
-            venue_list = [{venue: count} for venue, count in venue_counts.items()]
+            venue_list = [{venue: count} for venue, count in sorted(venue_counts.items(), key=lambda x: x[1], reverse=True)]
+            
+            # Convert topics counts to sorted list (descending order)
+            topics_list = [{topic: count} for topic, count in topic_counts.most_common()]
 
             # Convert coauthors dictionary to a list of dictionaries
             coauthors_list = [{"name": name, "pid": pid} for name, pid in coauthors_dict.items()]
@@ -490,7 +500,7 @@ class ResearcherProfileView(APIView):
                 "total_papers": len(publications),
                 "total_citations": 0,  # Placeholder
                 "venues": venue_list,
-                "topics": [],  # Topics can be aggregated later
+                "topics": topics_list,  # Topics can be aggregated later
                 "papers": publications,
                 "coauthors": coauthors_list,
             }, status=status.HTTP_200_OK)

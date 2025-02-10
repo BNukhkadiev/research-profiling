@@ -9,8 +9,8 @@ interface ResearcherProfileResponse {
   gIndex: number;
   totalPapers: number;
   totalCitations: number;
-  venues: Record<string, number>[];
-  topics: string[];
+  venues: { [key: string]: number }[]; // Now correctly mapped as an array of objects
+  topics: { [key: string]: number }[]; // Topics should also be an array of objects with counts
   papers: {
     title: string;
     year: number;
@@ -27,8 +27,13 @@ interface ResearcherProfileResponse {
 // Fetch function for researcher profile
 const fetchResearcherProfile = async (pid: string): Promise<ResearcherProfileResponse> => {
   const encodedPid = encodeURIComponent(pid); // Encode PID to handle slashes
-  const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?pid=${encodedPid}`);
-  return response.data;
+  try {
+    const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?pid=${encodedPid}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching researcher profile for PID: ${pid}`, error);
+    throw new Error("Failed to fetch researcher profile.");
+  }
 };
 
 // React Query hook for researcher profile
@@ -37,5 +42,7 @@ export const useResearcherProfileQuery = (pid: string) => {
     queryKey: ["researcherProfile", pid], // Unique query key based on PID
     queryFn: () => fetchResearcherProfile(pid), // Fetch function
     enabled: !!pid, // Ensures query runs only if PID exists
+    staleTime: 5 * 60 * 1000, // Cache data for 5 minutes
+    retry: 2, // Retry twice on failure
   });
 };
