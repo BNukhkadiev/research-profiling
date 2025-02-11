@@ -5,8 +5,8 @@ import { Table, TableBody, TableCell, TableRow, Button } from "@mui/material";
 
 interface VenueData {
   name: string;
-  papers: number;
-  ranking?: string;
+  count: number;
+  coreRank: string;
 }
 
 interface VenuesCardProps {
@@ -51,13 +51,13 @@ const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
                 {venue.name}
               </TableCell>
               <TableCell align="center" sx={{ color: "#555" }}>
-                {venue.papers}
+                {venue.count}
               </TableCell>
               <TableCell
                 align="right"
                 sx={{ fontStyle: "italic", color: "#555" }}
               >
-                {venue.ranking || "N/A"}
+                {venue.coreRank || "N/A"}
               </TableCell>
             </TableRow>
           ))}

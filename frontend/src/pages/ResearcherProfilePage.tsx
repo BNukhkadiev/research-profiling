@@ -14,8 +14,8 @@ import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery"
 
 interface VenueData {
   name: string;
-  papers: number;
-  ranking?: string;
+  count: number;
+  coreRank: string;
 }
 
 interface Coauthor {
@@ -31,7 +31,7 @@ const ResearcherProfilePage: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState({});
   const [venues, setVenues] = useState<VenueData[]>([]);
   const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
-  const [topics, setTopics] = useState<{ [key: string]: number }[]>([]);
+  const [topics, setTopics] = useState<{ name: string; count: number }[]>([]);
   const [publications, setPublications] = useState([]);
 
   const {
@@ -42,15 +42,7 @@ const ResearcherProfilePage: React.FC = () => {
 
   useEffect(() => {
     if (researcherProfile?.venues) {
-      const venueData: VenueData[] = researcherProfile.venues.map((venue) => {
-        const [venueName, paperCount] = Object.entries(venue)[0];
-        return {
-          name: venueName,
-          papers: paperCount as number,
-          ranking: getVenueRanking(venueName),
-        };
-      });
-      setVenues(venueData);
+      setVenues(researcherProfile.venues);
     }
   }, [researcherProfile]);
 
@@ -71,16 +63,6 @@ const ResearcherProfilePage: React.FC = () => {
       setPublications(researcherProfile.papers);
     }
   }, [researcherProfile]);
-
-  const getVenueRanking = (venue: string): string | undefined => {
-    const rankings = {
-      ICML: "A*",
-      NeurIPS: "A",
-      "Journal of Web Semantics": "B",
-      "IEEE Computer": "C",
-    };
-    return Object.entries(rankings).find(([key]) => venue.includes(key))?.[1];
-  };
 
   const handleFilterChange = (filters: any) => {
     setActiveFilters(filters);

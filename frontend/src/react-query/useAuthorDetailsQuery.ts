@@ -9,8 +9,8 @@ interface ResearcherProfileResponse {
   gIndex: number;
   totalPapers: number;
   totalCitations: number;
-  venues: { name: string; count: number }[]; // Explicitly define venue structure
-  topics: { name: string; count: number }[]; // Explicitly define topics structure
+  venues: { name: string; count: number; coreRank: string }[]; // Updated to include coreRank
+  topics: { name: string; count: number }[];
   papers: {
     title: string;
     year: number;
@@ -26,20 +26,23 @@ interface ResearcherProfileResponse {
 
 // Fetch function for researcher profile
 const fetchResearcherProfile = async (pid: string): Promise<ResearcherProfileResponse> => {
-  const encodedPid = encodeURIComponent(pid); // Encode PID to handle slashes
+  const encodedPid = encodeURIComponent(pid);
 
   try {
     const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?pid=${encodedPid}`);
-
     const data = response.data;
 
-    // ✅ Map backend fields (snake_case) to frontend fields (camelCase)
     return {
       ...data,
       hIndex: data['h-index'],
       gIndex: data['g-index'],
       totalPapers: data.total_papers,
       totalCitations: data.total_citations,
+      venues: data.venues.map((venue: any) => ({
+        name: Object.keys(venue)[0],
+        count: venue[Object.keys(venue)[0]].count,
+        coreRank: venue[Object.keys(venue)[0]].core_rank,
+      })),
       coauthors: data.coauthors.map((coauthor: any) => ({
         name: coauthor.name,
         pid: coauthor.pid,
@@ -55,10 +58,10 @@ const fetchResearcherProfile = async (pid: string): Promise<ResearcherProfileRes
 // React Query hook for researcher profile
 export const useResearcherProfileQuery = (pid: string) => {
   return useQuery<ResearcherProfileResponse>({
-    queryKey: ["researcherProfile", pid], // Unique query key based on PID
-    queryFn: () => fetchResearcherProfile(pid), // Fetch function
-    enabled: Boolean(pid), // Ensures query runs only if PID exists
-    staleTime: 5 * 60 * 1000, // Cache data for 5 minutes
-    retry: 2, // Retry twice on failure
+    queryKey: ["researcherProfile", pid],
+    queryFn: () => fetchResearcherProfile(pid),
+    enabled: Boolean(pid),
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
   });
 };

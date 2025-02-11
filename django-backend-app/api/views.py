@@ -13,14 +13,18 @@ import xml.etree.ElementTree as ET
 from utils.LLM import get_researcher_description
 from utils.keybert import KeywordExtractor
 from utils.abstracts import get_abstract_from_openalex
+from utils.CORE import fuzzy_match
 import string
 import difflib
 import urllib.parse
 from collections import Counter, defaultdict
+import pandas as pd
 
 
 extractor = KeywordExtractor()
-
+core_data =  pd.read_csv('data/CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
+core_data = core_data [['name', 'abbreviation', 'rank']]
+            
 # Set up logging
 logger = logging.getLogger(__name__)
 @method_decorator(csrf_exempt, name='dispatch')
@@ -393,7 +397,6 @@ class DBLPSearchView(APIView):
             return Response({"error": "Failed to parse DBLP XML."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
     
@@ -426,6 +429,7 @@ class ResearcherProfileView(APIView):
             coauthors_dict = defaultdict(int)  # Store coauthor names with count of coauthored papers
             coauthor_pids = {}  # Store PID of coauthors
             topic_counts = Counter()
+            venues_list = []
 
             for pub in root.findall(".//r"):
                 publ_info = pub.find("./*")
@@ -450,6 +454,7 @@ class ResearcherProfileView(APIView):
                         paper_type = "Other"
 
                     # Count venue occurrences
+                    venues_list.append(venue)
                     venue_counts[venue] = venue_counts.get(venue, 0) + 1
 
                     # Extract authors
@@ -485,8 +490,11 @@ class ResearcherProfileView(APIView):
                         "links": links
                     })
 
+            venue_ranks = {venue: fuzzy_match(core_data, venue, 'name', 'abbreviation') for venue in venues_list}
+
             # Convert venue counts to required format
-            venue_list = [{venue: count} for venue, count in sorted(venue_counts.items(), key=lambda x: x[1], reverse=True)]
+            venue_list = [{venue: {"count": count, "core_rank": venue_ranks.get(venue, "Unknown")}} 
+                          for venue, count in sorted(venue_counts.items(), key=lambda x: x[1], reverse=True)]
             topics_list = [{topic: count} for topic, count in topic_counts.most_common()]
 
             # Convert coauthors dictionary to list with coauthored publication count
@@ -495,6 +503,8 @@ class ResearcherProfileView(APIView):
                 for name, count in coauthors_dict.items()],
                 key=lambda x: x["publications_together"], reverse=True
             )
+
+            
 
             return Response({
                 "name": name,
