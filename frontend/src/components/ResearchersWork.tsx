@@ -2,26 +2,7 @@ import React, { useState } from "react";
 import { Tabs, Tab, Box, Typography } from "@mui/material";
 import PublicationsList from "./PublicationsList";
 
-<<<<<<< HEAD
 const ResearchersWork: React.FC<{ author: string }> = ({ author }) => {
-=======
-interface ResearchersWorkProps {
-  author: string;
-  authorId: string;
-  publications: {
-    title: string;
-    year: number;
-    type: string;
-    venue: string;
-    citations: number;
-    topics: string[];
-    authors: { name: string; pid: string }[];
-    links: string[];
-  }[];
-}
-
-const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, publications }) => {
->>>>>>> origin/bagas_branch
   const [activeTab, setActiveTab] = useState("publications");
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
@@ -58,20 +39,13 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, pub
       >
         {activeTab === "publications" && (
           <>
-            <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
+            <Typography
+              variant="h6"
+              sx={{ marginBottom: 2, fontWeight: "bold" }}
+            >
               Publications by {author}
             </Typography>
-<<<<<<< HEAD
             <PublicationsList author={author} />
-=======
-            {publications.length > 0 ? (
-              <PublicationsList publications={publications} />
-            ) : (
-              <Typography variant="body2" color="textSecondary">
-                No publications found for {author}.
-              </Typography>
-            )}
->>>>>>> origin/bagas_branch
           </>
         )}
         {activeTab === "repositories" && (

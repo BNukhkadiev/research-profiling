@@ -1,34 +1,23 @@
 import React from "react";
-<<<<<<< HEAD
 import { Box, Typography, Button } from "@mui/material";
-=======
-import { Box, Typography, Button, Tooltip } from "@mui/material";
-import { Link } from "react-router-dom";
->>>>>>> origin/bagas_branch
 
 interface SearchCardProps {
   name: string;
   affiliations: string[];
-  pid: string;
-  dblp_url: string;
-  abstract: string;
+  profileUrl: string;
   addToCompare: () => void;
   isSelected: boolean;
-  onViewProfile: () => void; // Function to navigate to profile page
+  onViewProfile: () => void; // Prop for navigation
 }
 
 const SearchCard: React.FC<SearchCardProps> = ({
   name,
   affiliations,
-  pid,
-  dblp_url,
-  abstract,
+  profileUrl,
   addToCompare,
   isSelected,
   onViewProfile,
 }) => {
-  const encodedPid = encodeURIComponent(pid); // Encode PID properly for URL
-
   return (
     <Box
       sx={{
@@ -46,50 +35,11 @@ const SearchCard: React.FC<SearchCardProps> = ({
       <Typography variant="h6" sx={{ fontWeight: "bold" }}>
         {name}
       </Typography>
-<<<<<<< HEAD
       <Typography variant="body2" color="textSecondary" sx={{ marginTop: 1 }}>
         {affiliations.length > 0
           ? affiliations.join(", ")
           : "No affiliations available"}
       </Typography>
-=======
-
-      <Tooltip
-        title={affiliations.length > 0 ? affiliations.join(", ") : "No affiliations available"}
-        placement="bottom-start"
-        arrow
-      >
-        <Typography
-          variant="body2"
-          color="textSecondary"
-          sx={{
-            marginTop: 1,
-            wordWrap: "break-word",
-            maxHeight: "4.5rem",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {affiliations.length > 0 ? affiliations.join(", ") : "No affiliations available"}
-        </Typography>
-      </Tooltip>
-
-      {/* Researcher abstract */}
-      <Typography
-        variant="body2"
-        color="textPrimary"
-        sx={{
-          marginTop: 1.5,
-          fontStyle: "italic",
-          maxHeight: "4.5rem",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {abstract}
-      </Typography>
-
->>>>>>> origin/bagas_branch
       <Box
         sx={{
           display: "flex",
@@ -98,27 +48,13 @@ const SearchCard: React.FC<SearchCardProps> = ({
           marginTop: 2,
         }}
       >
-        {/* Navigate to Researcher Profile Page */}
         <Button
           variant="outlined"
-          component={Link}
-          to={`/profile/${encodedPid}`} // Navigate to researcher profile
+          onClick={onViewProfile}
           sx={{ textTransform: "none" }}
         >
           View Profile
         </Button>
-
-        {/* Open DBLP Profile */}
-        <Button
-          variant="outlined"
-          href={dblp_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          sx={{ textTransform: "none" }}
-        >
-          View on DBLP
-        </Button>
-
         <Button
           variant="contained"
           onClick={addToCompare}

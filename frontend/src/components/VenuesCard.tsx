@@ -3,7 +3,6 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { Table, TableBody, TableCell, TableRow } from "@mui/material";
 
-<<<<<<< HEAD
 const VenuesCard: React.FC = () => {
   const data = [
     { name: "ICML 2024", papers: 2, ranking: "A*" },
@@ -11,25 +10,6 @@ const VenuesCard: React.FC = () => {
     { name: "Journal of Web Semantics", papers: 1, ranking: "B" },
     { name: "IEEE Computer", papers: 19, ranking: "C" },
   ];
-=======
-interface VenueData {
-  name: string;
-  count: number;
-  coreRank: string;
-}
-
-interface VenuesCardProps {
-  venues: VenueData[];
-}
-
-const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
-  const [visibleCount, setVisibleCount] = useState(5); // Initial number of venues to display
-
-  // Function to load more venues
-  const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5); // Show 5 more venues
-  };
->>>>>>> origin/bagas_branch
 
   return (
     <Box
@@ -61,21 +41,13 @@ const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
                 {item.name}
               </TableCell>
               <TableCell align="center" sx={{ color: "#555" }}>
-<<<<<<< HEAD
                 {item.papers}
-=======
-                {venue.count}
->>>>>>> origin/bagas_branch
               </TableCell>
               <TableCell
                 align="right"
                 sx={{ fontStyle: "italic", color: "#555" }}
               >
-<<<<<<< HEAD
                 {item.ranking}
-=======
-                {venue.coreRank || "N/A"}
->>>>>>> origin/bagas_branch
               </TableCell>
             </TableRow>
           ))}
