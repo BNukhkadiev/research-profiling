@@ -9,35 +9,6 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token  # For token-based auth
 from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
-<<<<<<< HEAD:backend/api/views.py
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.authtoken.models import Token
-from django.contrib.auth.models import User
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.status import HTTP_404_NOT_FOUND
-from .models import Researcher
-
-class ResearcherAffiliationsAPIView(APIView):
-    def get(self, request, researcher_id):
-        try:
-            researcher = Researcher.objects.get(id=researcher_id)
-        except Researcher.DoesNotExist:
-            return Response({"error": "Researcher not found"}, status=HTTP_404_NOT_FOUND)
-
-        affiliations = researcher.affiliations.order_by("start_year")
-        data = [
-            {
-                "institution": affiliation.institution,
-                "start_year": affiliation.start_year,
-                "end_year": affiliation.end_year,
-                "position": affiliation.position,
-            }
-            for affiliation in affiliations
-        ]
-        return Response({"name": researcher.name, "affiliations": data})
-=======
 import xml.etree.ElementTree as ET
 from utils.LLM import get_researcher_description
 from utils.keybert import KeywordExtractor
@@ -48,7 +19,6 @@ import difflib
 import urllib.parse
 from collections import Counter, defaultdict
 import pandas as pd
->>>>>>> origin/bagas_branch:django-backend-app/api/views.py
 
 
 extractor = KeywordExtractor()
@@ -58,169 +28,218 @@ core_data = core_data [['name', 'abbreviation', 'rank']]
 # Set up logging
 logger = logging.getLogger(__name__)
 @method_decorator(csrf_exempt, name='dispatch')
-class DBLPSearchView(APIView):
+class SemanticScholarSearchView(APIView):
     permission_classes = [AllowAny]
-    """
-    Handles search for authors on DBLP.
-    """
+
     def get(self, request):
-        # Get the search term from the query parameter
         search_query = request.GET.get('query', '')
         logger.info(f"Received author search request with query: {search_query}")
 
         if not search_query:
             return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Query the DBLP API for authors
-        dblp_url = f"https://dblp.org/search/author/api?q={search_query}&format=json"
-        logger.info(f"Making request to DBLP API: {dblp_url}")
-
         try:
+            # Query Semantic Scholar
+            semantic_scholar_url = (
+                f"https://api.semanticscholar.org/graph/v1/author/search?"
+                f"query={search_query}&fields=name,url,affiliations,paperCount,hIndex,citationCount,"
+                f"externalIds,papers.title,papers.year"
+            )
+            logger.info(f"Querying Semantic Scholar API: {semantic_scholar_url}")
+            semantic_scholar_response = requests.get(semantic_scholar_url)
+            semantic_scholar_response.raise_for_status()
+            semantic_scholar_data = semantic_scholar_response.json()
+
+            # Query DBLP
+            dblp_url = f"https://dblp.org/search/author/api?q={search_query}&format=json"
+            logger.info(f"Querying DBLP API: {dblp_url}")
             dblp_response = requests.get(dblp_url)
-            logger.info(f"DBLP API response status code: {dblp_response.status_code}")
-            dblp_response.raise_for_status()  # Raise error for HTTP issues
-            data = dblp_response.json()  # Parse JSON response
-            logger.info(f"DBLP API response data: {data}")
-            return Response(data, status=status.HTTP_200_OK)
+            dblp_response.raise_for_status()
+            dblp_data = dblp_response.json()
+
+            if not semantic_scholar_data.get("data") or not dblp_data.get("result", {}).get("hits", {}).get("hit"):
+                logger.warning("No authors found in Semantic Scholar or DBLP.")
+                return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Process authors
+            dblp_authors = dblp_data["result"]["hits"]["hit"]
+            processed_authors = []
+            for scholar_author in semantic_scholar_data["data"]:
+                scholar_paper_titles = {
+                    paper["title"].strip().rstrip(".") for paper in scholar_author.get("papers", []) if "title" in paper
+                }
+
+                best_match = None
+                max_intersection_size = 0
+
+                for dblp_author in dblp_authors:
+                    author_name = dblp_author["info"]["author"]
+                    author_url = dblp_author["info"].get("url")
+                    dblp_affiliations = []
+                    dblp_paper_titles = []
+
+                    if not author_url:
+                        logger.debug(f"No URL found for DBLP author: {author_name}")
+                        continue
+
+                    try:
+                        # Fetch DBLP XML
+                        logger.info(f"Fetching DBLP XML for author: {author_name} from {author_url}")
+                        author_profile_response = requests.get(f"{author_url}.xml")
+                        author_profile_response.raise_for_status()
+                        root = ET.fromstring(author_profile_response.text)
+
+                        # Extract DBLP paper titles
+                        dblp_paper_titles = [title.text.rstrip(".") for title in root.findall(".//title")]
+                        logger.debug(f"Extracted DBLP titles for {author_name}: {dblp_paper_titles}")
+                        # print(f"Extracted DBLP titles for {author_name}: {dblp_paper_titles}")
+
+                        # Extract affiliations from DBLP notes
+                        if "notes" in dblp_author["info"]:
+                            notes = dblp_author["info"]["notes"].get("note", [])
+                            if isinstance(notes, dict):  # Single note case
+                                notes = [notes]
+                            dblp_affiliations = [
+                                note["text"] for note in notes if note.get("@type") == "affiliation"
+                            ]
+                            logger.debug(f"Extracted affiliations for {author_name}: {dblp_affiliations}")
+                            # print(f"Extracted affiliations for {author_name}: {dblp_affiliations}")
+                        # Determine the intersection size
+                        intersection_size = len(scholar_paper_titles.intersection(dblp_paper_titles))
+                        logger.debug(f"Intersection size for {author_name}: {intersection_size}")
+                        print(f"Intersection size for {author_name}: {intersection_size}")
+
+                        if intersection_size > max_intersection_size and intersection_size>3:
+                            max_intersection_size = intersection_size
+                            best_match = {"affiliations": dblp_affiliations}
+
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"Error fetching DBLP XML for author {author_name}: {e}")
+                    except ET.ParseError as e:
+                        logger.error(f"Error parsing DBLP XML for author {author_name}: {e}")
+
+                # Add the best match's affiliations
+                if best_match:
+                    scholar_author["affiliations"].extend(best_match["affiliations"])
+                else:
+                    logger.warning(f"No match found for Semantic Scholar author: {scholar_author['name']}")
+
+                processed_authors.append(scholar_author)
+
+            logger.info("Processed authors with enriched affiliations.")
+            return Response({"data": processed_authors}, status=status.HTTP_200_OK)
+
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error while calling DBLP API: {e}")
+            logger.error(f"Error querying APIs: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-<<<<<<< HEAD:backend/api/views.py
-class DBLPPublicationSearchView(APIView):
-=======
 #########
 class PublicationSearchView(APIView):
->>>>>>> origin/bagas_branch:django-backend-app/api/views.py
     permission_classes = [AllowAny]
     """
-    Handles search for publications on DBLP.
+    Handles retrieval of publications for a given author using Semantic Scholar.
     """
+
     def get(self, request):
-        # Get the search term from the query parameter
-        search_query = request.GET.get('query', '')
-        logger.info(f"Received publication search request with query: {search_query}")
+        # Get the author ID from the query parameter
+        author_id = request.GET.get('author_id', '')
+        logger.info(f"Received publication search request for author ID: {author_id}")
 
-        if not search_query:
-            return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not author_id:
+            return Response({"error": "Author ID parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Query the DBLP API for publications
-        dblp_url = f"https://dblp.org/search/publ/api?q={search_query}&format=json"
-        logger.info(f"Making request to DBLP API: {dblp_url}")
+        # Semantic Scholar API query URL with expanded fields
+        semantic_scholar_url = (
+            f"https://api.semanticscholar.org/graph/v1/author/{author_id}/papers?"
+            f"fields=url,title,year,authors,abstract,venue,citationCount,fieldsOfStudy"
+        )
+        logger.info(f"Making request to Semantic Scholar API: {semantic_scholar_url}")
 
         try:
-            dblp_response = requests.get(dblp_url)
-            logger.info(f"DBLP API response status code: {dblp_response.status_code}")
-            dblp_response.raise_for_status()  # Raise error for HTTP issues
-            data = dblp_response.json()  # Parse JSON response
-            logger.info(f"DBLP API response data: {data}")
-            return Response(data, status=status.HTTP_200_OK)
+            # Make the API request
+            semantic_scholar_response = requests.get(semantic_scholar_url)
+            logger.info(f"Semantic Scholar API response status code: {semantic_scholar_response.status_code}")
+            semantic_scholar_response.raise_for_status()  # Raise error for HTTP issues
+            
+            # Parse JSON response
+            data = semantic_scholar_response.json()
+            
+            # Transform the data into a structured response if needed
+            publications = data.get("data", [])
+            formatted_publications = []
+            for pub in publications:
+                formatted_publications.append({
+                    "url": pub.get("url"),
+                    "title": pub.get("title"),
+                    "year": pub.get("year"),
+                    "authors": [
+                        {"name": author.get("name"), "id": author.get("authorId")}
+                        for author in pub.get("authors", [])
+                    ],
+                    "abstract": pub.get("abstract"),
+                    "venue": pub.get("venue"),
+                    "citationCount": pub.get("citationCount"),
+                    "fieldsOfStudy": pub.get("fieldsOfStudy"),
+                })
+
+            # Return the transformed response
+            logger.info(f"Successfully fetched and formatted {len(formatted_publications)} publications.")
+            return Response({"publications": formatted_publications}, status=status.HTTP_200_OK)
+
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error while calling DBLP API: {e}")
+            logger.error(f"Error while calling Semantic Scholar API: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        from django.contrib.auth import authenticate
 
-@method_decorator(csrf_exempt, name='dispatch')
-class LoginView(APIView):
-    """
-    Class-Based View for User Login.
-    Accepts email and password, authenticates the user,
-    and returns an authentication token.
-    """
+
+
+class AuthorDetailsView(APIView):
     permission_classes = [AllowAny]
+    """
+    Handles fetching author details from Semantic Scholar and processes the affiliation.
+    """
 
-    def post(self, request):
-        # Extract email and password from the request data
-        email = request.data.get('email')
-        password = request.data.get('password')
+    def get(self, request):
+        # Get the author ID and affiliation from the query parameters
+        author_id = request.GET.get("author_id", "")
+        affiliation = request.GET.get("affiliation", "")
+        logger.info(
+            f"Received request to fetch details for author ID: {author_id} with affiliation: {affiliation}"
+        )
 
-        # Validate input
-        if not email or not password:
+        if not author_id:
             return Response(
-                {"error": "Email and password are required."},
+                {"error": "Author ID is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Query the Semantic Scholar API for the author's details
+        semantic_scholar_url = (
+            f"https://api.semanticscholar.org/graph/v1/author/{author_id}?"
+            f"fields=name,url,affiliations,paperCount,hIndex,citationCount"
+        )
+        logger.info(f"Querying Semantic Scholar API: {semantic_scholar_url}")
 
         try:
-            # Find the user by email
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            return Response(
-                {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
-            )
+            semantic_scholar_response = requests.get(semantic_scholar_url)
+            semantic_scholar_response.raise_for_status()
+            author_data = semantic_scholar_response.json()
 
-        # Authenticate the user using username and password
-        user = authenticate(username=user.username, password=password)
+            # Attach the provided affiliation if not already present
+            if affiliation and affiliation not in author_data.get("affiliations", []):
+                author_data.setdefault("affiliations", []).append(affiliation)
 
-        if user is not None:
-            # Generate or retrieve a token
-            token, created = Token.objects.get_or_create(user=user)
-            return Response(
-                {
-                    "token": token.key,
-                    "user": {
-                        "id": user.id,
-                        "email": user.email,
-                        "name": user.get_full_name() or user.username,
-                    },
-                },
-                status=status.HTTP_200_OK,
-            )
-        else:
-            return Response(
-                {"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED
-            )
-from rest_framework.permissions import AllowAny
-class SignupView(APIView):
-    permission_classes = [AllowAny]
-    def post(self, request):
-        
-        first_name = request.data.get("first_name")
-        last_name = request.data.get("last_name")
-        email = request.data.get("email")
-        password = request.data.get("password")
+            # Return the enriched author data
+            logger.info(f"Author data fetched and processed successfully: {author_data}")
+            return Response(author_data, status=status.HTTP_200_OK)
 
-        
-        if not first_name or not last_name or not email or not password:
-            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error querying Semantic Scholar API: {e}")
             return Response(
-                {"error": "All fields are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        
-        if User.objects.filter(email=email).exists():
-            
-            return Response(
-                {"error": "A user with this email already exists."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        
-        try:
-            user = User.objects.create_user(
-                username=email,
-                email=email,
-                password=password,
-                first_name=first_name,
-                last_name=last_name,
-            )
-            user.save()
-        except Exception as e:
-            
-            return Response(
-                {"error": "An error occurred while creating the user: " + str(e)},
+                {"error": "Failed to fetch author details."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-<<<<<<< HEAD:backend/api/views.py
-        
-        return Response(
-            {"message": "User created successfully."},
-            status=status.HTTP_201_CREATED,
-        )
-=======
 
 class PaperDetailsView(APIView):
     permission_classes = [AllowAny]
@@ -503,4 +522,3 @@ class ResearcherProfileView(APIView):
         except requests.exceptions.RequestException as e:
             logger.error(f"Error querying DBLP API: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
->>>>>>> origin/bagas_branch:django-backend-app/api/views.py
