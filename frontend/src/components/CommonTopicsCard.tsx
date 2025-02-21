@@ -5,15 +5,13 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import TopicIcon from "@mui/icons-material/Topic"; // Add an icon for topics
+import TopicIcon from "@mui/icons-material/Topic";
 
-const CommonTopicsCard: React.FC = () => {
-  const topics = [
-    "Machine Learning",
-    "Data Mining",
-    "Large Scale Computations",
-  ];
+interface CommonTopicsCardProps {
+  topics: { [key: string]: number }[]; // Array of objects with topic name and count
+}
 
+const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
   return (
     <Box
       sx={{
@@ -33,16 +31,30 @@ const CommonTopicsCard: React.FC = () => {
       >
         Common Topics
       </Typography>
-      <List>
-        {topics.map((topic) => (
-          <ListItem key={topic} sx={{ padding: 0 }}>
-            <ListItemIcon>
-              <TopicIcon sx={{ color: "#1976d2" }} /> {/* Icon color */}
-            </ListItemIcon>
-            <ListItemText primary={topic} sx={{ color: "#555" }} />
-          </ListItem>
-        ))}
-      </List>
+      {topics.length > 0 ? (
+        <List>
+          {topics.map((topicObj, index) => {
+            const topic = Object.keys(topicObj)[0]; // Extract topic name
+            const count = topicObj[topic]; // Extract count
+
+            return (
+              <ListItem key={index} sx={{ padding: 0 }}>
+                <ListItemIcon>
+                  <TopicIcon sx={{ color: "#1976d2" }} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={`${topic} (${count})`} // Display topic name and count
+                  sx={{ color: "#555" }}
+                />
+              </ListItem>
+            );
+          })}
+        </List>
+      ) : (
+        <Typography variant="body2" color="textSecondary">
+          No topics available.
+        </Typography>
+      )}
     </Box>
   );
 };

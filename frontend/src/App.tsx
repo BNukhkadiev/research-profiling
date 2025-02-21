@@ -3,7 +3,11 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Header from "./components/Header";
 import HomePage from "./pages/HomePage";
 import SearchResultsPage from "./pages/SearchResultsPage";
+<<<<<<< HEAD
 import "./app.css"; 
+=======
+import "./App.css"; // Import the CSS file
+>>>>>>> origin/bagas_branch
 import ResearcherProfilePage from "./pages/ResearcherProfilePage";
 import CompareResearchersPage from "./pages/CompareResearchersPage";
 import LoginPage from "./pages/LoginPage";
@@ -22,6 +26,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/logout" element={<LogoutPage />} />
         <Route path="/" element={<HomePage />} />
+<<<<<<< HEAD
         <Route path="/search" element={<SearchResultsPage />} />{" "}
         <Route path="/profile" element={<ResearcherProfilePage />} />
         <Route
@@ -29,6 +34,12 @@ function App() {
           element={<CompareResearchersPage />}
         />
         {}
+=======
+        <Route path="/search" element={<SearchResultsPage />} />
+        <Route path="/profile/:pid" element={<ResearcherProfilePage />} /> {/* Updated Route */}
+        <Route path="/compare-researchers" element={<CompareResearchersPage />} />
+        <Route path="/publication/:publicationId" element={<PublicationDetailsPage />} />
+>>>>>>> origin/bagas_branch
       </Routes>
     </Router>
   );
