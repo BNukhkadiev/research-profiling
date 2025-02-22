@@ -1,7 +1,0 @@
--- Create table for awards
-CREATE TABLE awards (
-    id SERIAL PRIMARY KEY,
-    researcher_id INT,
-    award_name VARCHAR(255),
-    FOREIGN KEY (researcher_id) REFERENCES researchers(id)
-);

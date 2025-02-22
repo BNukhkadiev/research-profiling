@@ -10,7 +10,7 @@ from rest_framework.authtoken.models import Token  # For token-based auth
 from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
 import xml.etree.ElementTree as ET
-#from utils.LLM import get_researcher_description
+##from utils.LLM import get_researcher_description
 from utils.keybert import KeywordExtractor
 from utils.abstracts import get_abstract_from_openalex
 from utils.CORE import fuzzy_match
@@ -376,9 +376,7 @@ class DBLPSearchView(APIView):
                 # Generate LLM-based abstract
                 titles = [title for title, _ in publications]
                # abstract = get_researcher_description(name=author_name, paper_titles=titles[:5])
-
                 abstract = 'bla bla'
-                
                 # Append author data to list
                 authors_list.append({
                     "name": author_name,
@@ -476,8 +474,9 @@ class ResearcherProfileView(APIView):
 
                     # Extract topics using KeywordExtractor
                     abstract = "Some abstract here bla bla bla bla "
-                   ## raw_topics = extractor.extract_keywords(doc=abstract)
-                 ##   topics = [topic[0] for topic in raw_topics]
+                  #  raw_topics = extractor.extract_keywords(doc=abstract)
+                  #  topics = [topic[0] for topic in raw_topics]
+                    topics = " bla bla"
 
                     topic_counts.update(topics)
 
@@ -487,7 +486,7 @@ class ResearcherProfileView(APIView):
                         "type": paper_type,
                         "venue": venue,
                         "citations": 0,  # Placeholder
-                        "topics": "blablabalbal",
+                        "topics": topics,
                         "authors": paper_authors,
                         "links": links
                     })

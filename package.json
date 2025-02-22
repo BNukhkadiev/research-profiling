@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "react-date-picker": "^11.0.0",
-    "react-scripts": "^5.0.1"
+    "react-date-picker": "^11.0.0"
   }
 }

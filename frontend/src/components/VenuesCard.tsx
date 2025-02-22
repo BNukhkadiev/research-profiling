@@ -1,22 +1,32 @@
-import React from "react";
+import React, { useState } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
-import { Table, TableBody, TableCell, TableRow } from "@mui/material";
+import { Table, TableBody, TableCell, TableRow, Button } from "@mui/material";
 
-const VenuesCard: React.FC = () => {
-  const data = [
-    { name: "ICML 2024", papers: 2, ranking: "A*" },
-    { name: "NeurIPS 2024", papers: 1, ranking: "A" },
-    { name: "Journal of Web Semantics", papers: 1, ranking: "B" },
-    { name: "IEEE Computer", papers: 19, ranking: "C" },
-  ];
+interface VenueData {
+  name: string;
+  count: number;
+  coreRank: string;
+}
+
+interface VenuesCardProps {
+  venues: VenueData[];
+}
+
+const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
+  const [visibleCount, setVisibleCount] = useState(5); // Initial number of venues to display
+
+  // Function to load more venues
+  const handleLoadMore = () => {
+    setVisibleCount((prevCount) => prevCount + 5); // Show 5 more venues
+  };
 
   return (
     <Box
       sx={{
         padding: 3,
         borderRadius: "8px",
-        backgroundColor: "#FFFFFF", // Light background
+        backgroundColor: "#FFFFFF",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -25,7 +35,7 @@ const VenuesCard: React.FC = () => {
         sx={{
           fontWeight: "bold",
           marginBottom: 2,
-          color: "#333", // Darker title color
+          color: "#333",
         }}
       >
         Venues
@@ -35,24 +45,38 @@ const VenuesCard: React.FC = () => {
         sx={{ "& td": { border: "none", padding: "4px 8px" } }}
       >
         <TableBody>
-          {data.map((item) => (
-            <TableRow key={item.name}>
+          {venues.slice(0, visibleCount).map((venue) => (
+            <TableRow key={venue.name}>
               <TableCell sx={{ fontWeight: "bold", color: "#333" }}>
-                {item.name}
+                {venue.name}
               </TableCell>
               <TableCell align="center" sx={{ color: "#555" }}>
-                {item.papers}
+                {venue.count}
               </TableCell>
               <TableCell
                 align="right"
                 sx={{ fontStyle: "italic", color: "#555" }}
               >
-                {item.ranking}
+                {venue.coreRank || "N/A"}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {/* Load More Button */}
+      {visibleCount < venues.length && (
+        <Button
+          variant="contained"
+          onClick={handleLoadMore}
+          sx={{
+            marginTop: 2,
+            textTransform: "none",
+          }}
+        >
+          Load More
+        </Button>
+      )}
     </Box>
   );
 };
