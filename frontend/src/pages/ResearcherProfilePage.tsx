@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Box, Typography } from "@mui/material";
+import { useAuthorDetailsQuery } from "../react-query/useAuthorDetailsQuery";
+import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 import ProfileHeader from "../components/ProfileHeader";
 import AwardsCard from "../components/AwardsCard";
 import VenuesCard from "../components/VenuesCard";
 import CommonTopicsCard from "../components/CommonTopicsCard";
-import Filters from "../components/Filters";
+import Filters, { FilterState } from "../components/Filters";
 import StatisticsCard from "../components/StatisticsCard";
 import CoauthorsSection from "../components/CoauthorsSection";
+import { getCoreRanking } from "../utilities/coreRankings";
 import ResearchersWork from "../components/ResearchersWork";
-import { useAuthorDetailsQuery } from "../react-query/useAuthorDetailsQuery";
-import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 
-interface VenueData {
-  name: string;
-  papers: number;
-  ranking?: string;
+// Example interfaces
+interface Publication {
+  url: string;
+  title: string;
+  year: number;
+  venue?: string;
+  citationCount?: number;
+  topics?: string[];
+  authors: { name: string; id?: string }[];
 }
 
 interface Coauthor {
@@ -24,86 +29,174 @@ interface Coauthor {
   id: string;
 }
 
+interface VenueData {
+  name: string;
+  papers: number;
+  ranking?: string;
+}
+
 const ResearcherProfilePage: React.FC = () => {
-  const { authorId, affiliation } = useParams<{ authorId: string; affiliation?: string }>();
-  const decodedAffiliation = affiliation ? decodeURIComponent(affiliation) : undefined;
+  const { authorId } = useParams<{ authorId?: string }>();
+  const safeAuthorId = authorId ?? "UnknownAuthor";
 
-  const [activeFilters, setActiveFilters] = useState({});
-  const [venues, setVenues] = useState<VenueData[]>([]);
-  const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
-
-  // Fetch author details
+  // 1) Fetch author details
   const {
     data: authorDetails,
     isLoading: loadingAuthorDetails,
     isError: errorAuthorDetails,
-    error: authorDetailsError,
-  } = useAuthorDetailsQuery(authorId || "");
+  } = useAuthorDetailsQuery(safeAuthorId);
 
-  // Fetch publications
+  // 2) Fetch all publications
   const {
-    data: publications = [],
+    data: allPublications = [],
     isLoading: loadingPublications,
     isError: errorPublications,
-  } = usePublicationsQuery(authorId || "");
+  } = usePublicationsQuery<Publication[]>(safeAuthorId);
 
-  // Extract venues from publications and compute counts/rankings
+  // For bounding the year-based filter
+  const [minYear, setMinYear] = useState<number | null>(null);
+  const [maxYear, setMaxYear] = useState<number | null>(null);
+
+  // For dynamic venue filter
+  const [availableVenues, setAvailableVenues] = useState<string[]>([]);
+
+  // The user's chosen filters
+  const [activeFilters, setActiveFilters] = useState<FilterState>({
+    startYear: null,
+    endYear: null,
+    venues: [],
+    coreRanking: null,
+    sort: null,
+  });
+
+  // Filtered publications
+  const [filteredPublications, setFilteredPublications] = useState<Publication[]>([]);
+
+  // Derived data
+  const [venues, setVenues] = useState<VenueData[]>([]);
+  const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
+  const [commonTopics, setCommonTopics] = useState<string[]>([]);
+
+  // A) minYear, maxYear, availableVenues
   useEffect(() => {
-    if (publications.length > 0) {
-      const venueMap: Record<string, { papers: number; ranking?: string }> = {};
-      publications.forEach((pub) => {
-        if (pub.venue) {
-          if (!venueMap[pub.venue]) {
-            venueMap[pub.venue] = { papers: 0, ranking: getVenueRanking(pub.venue) };
-          }
-          venueMap[pub.venue].papers += 1;
+    if (!allPublications.length) {
+      setMinYear(null);
+      setMaxYear(null);
+      setAvailableVenues([]);
+      return;
+    }
+    const years = allPublications.map((p) => p.year);
+    setMinYear(Math.min(...years));
+    setMaxYear(Math.max(...years));
+
+    const venueSet = new Set<string>();
+    allPublications.forEach((pub) => {
+      if (pub.venue) {
+        venueSet.add(pub.venue);
+      }
+    });
+    setAvailableVenues(Array.from(venueSet));
+  }, [allPublications]);
+
+  // B) Filter logic
+  useEffect(() => {
+    if (!allPublications.length) {
+      setFilteredPublications([]);
+      return;
+    }
+    let temp = [...allPublications];
+
+    // 1) Year-based filter
+    if (activeFilters.startYear !== null && activeFilters.endYear !== null) {
+      temp = temp.filter(
+        (pub) => pub.year >= activeFilters.startYear! && pub.year <= activeFilters.endYear!
+      );
+    }
+
+    // 2) Venues
+    if (activeFilters.venues.length > 0) {
+      temp = temp.filter(
+        (pub) => pub.venue && activeFilters.venues.includes(pub.venue)
+      );
+    }
+
+    // 3) Core ranking
+    if (activeFilters.coreRanking) {
+      temp = temp.filter((pub) => {
+        const rank = getCoreRanking(pub.venue);
+        return rank === activeFilters.coreRanking;
+      });
+    }
+
+    // 4) Sort
+    if (activeFilters.sort === "Newest") {
+      temp.sort((a, b) => b.year - a.year);
+    } else if (activeFilters.sort === "Oldest") {
+      temp.sort((a, b) => a.year - b.year);
+    }
+
+    setFilteredPublications(temp);
+  }, [allPublications, activeFilters]);
+
+  // C) Derive Venues, Coauthors, Topics
+  useEffect(() => {
+    if (!filteredPublications.length) {
+      setVenues([]);
+      setCoauthors([]);
+      setCommonTopics([]);
+      return;
+    }
+
+    const venueMap: Record<string, { papers: number; ranking?: string }> = {};
+    const coauthorMap: Record<string, Coauthor> = {};
+    const topicMap: Record<string, number> = {};
+
+    filteredPublications.forEach((pub) => {
+      // Venues
+      if (pub.venue) {
+        const rank = getCoreRanking(pub.venue);
+        if (!venueMap[pub.venue]) {
+          venueMap[pub.venue] = { papers: 0, ranking: rank };
+        }
+        venueMap[pub.venue].papers += 1;
+      }
+
+      // Coauthors
+      pub.authors.forEach((author) => {
+        if (author.id !== safeAuthorId) {
+          const coKey = author.id || author.name;
+          coauthorMap[coKey] = { name: author.name, id: coKey };
         }
       });
 
-      const venueData: VenueData[] = Object.entries(venueMap).map(([name, data]) => ({
-        name,
-        papers: data.papers,
-        ranking: data.ranking,
-      }));
-
-      setVenues(venueData);
-    }
-  }, [publications]);
-
-  // Extract coauthors from publications
-  useEffect(() => {
-    if (publications.length > 0) {
-      const coauthorMap: Record<string, Coauthor> = {};
-
-      publications.forEach((publication) => {
-        publication.authors.forEach((author) => {
-          if (author.id !== authorId) {
-            // Ensure we don't include the current researcher as their own coauthor
-            coauthorMap[author.id] = { name: author.name, id: author.id };
-          }
+      // Topics
+      if (pub.topics) {
+        pub.topics.forEach((topic) => {
+          if (!topicMap[topic]) topicMap[topic] = 0;
+          topicMap[topic]++;
         });
-      });
+      }
+    });
 
-      const coauthorData = Object.values(coauthorMap);
-      setCoauthors(coauthorData);
-    }
-  }, [publications, authorId]);
+    const newVenues = Object.entries(venueMap).map(([name, data]) => ({
+      name,
+      papers: data.papers,
+      ranking: data.ranking,
+    }));
 
-  // Function to fetch ranking data (replace with actual logic if available)
-  const getVenueRanking = (venue: string): string | undefined => {
-    const rankings = {
-      ICML: "A*",
-      NeurIPS: "A",
-      "Journal of Web Semantics": "B",
-      "IEEE Computer": "C",
-    };
-    return Object.entries(rankings).find(([key]) => venue.includes(key))?.[1];
-  };
+    setVenues(newVenues);
+    setCoauthors(Object.values(coauthorMap));
 
-  const handleFilterChange = (filters: any) => {
+    const sortedTopics = Object.keys(topicMap).sort((a, b) => topicMap[b] - topicMap[a]);
+    setCommonTopics(sortedTopics);
+  }, [filteredPublications, safeAuthorId]);
+
+  // D) Handle filter updates
+  const handleFilterChange = (filters: FilterState) => {
     setActiveFilters(filters);
   };
 
+  // Loading states
   if (!authorId) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
@@ -113,7 +206,6 @@ const ResearcherProfilePage: React.FC = () => {
       </Box>
     );
   }
-
   if (loadingAuthorDetails || loadingPublications) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
@@ -121,79 +213,70 @@ const ResearcherProfilePage: React.FC = () => {
       </Box>
     );
   }
-
   if (errorAuthorDetails || errorPublications) {
-    console.error("Error fetching data:", authorDetailsError);
-
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4" color="error">
-          Failed to fetch data. Please try again later.
+          Failed to load data.
         </Typography>
       </Box>
     );
   }
 
-  // Prepare data for the StatisticsCard
+  // Example stats
   const statistics = {
-    papers: authorDetails?.paperCount || 0,
+    papers: authorDetails?.paperCount || filteredPublications.length,
     citations: authorDetails?.citationCount || 0,
     hIndex: authorDetails?.hIndex || 0,
-    gIndex: authorDetails?.gIndex || 0, // Assuming gIndex is part of authorDetails; add/remove as necessary
+    gIndex: 0,
   };
 
   return (
-    <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
-      {/* Filters */}
-      <Filters onFilterChange={handleFilterChange} />
+    <Box sx={{ minHeight: "100vh", backgroundColor: "#f5f7fa" }}>
+      {/* (Removed the second Mannheim View heading) */}
 
       {/* Profile Header */}
-      <ProfileHeader
-        author={authorDetails?.name || "Unknown Author"}
-        profileUrl={authorDetails?.url || ""}
-        affiliations={
-          decodedAffiliation || authorDetails?.affiliations?.join(", ") || "Affiliations not available"
-        }
-        addToCompare={() =>
-          console.log(`Add to Compare Clicked for ${authorDetails?.name}`)
-        }
-        isSelected={false} // Example: Update state if dynamic selection is needed
-      />
+      <Box sx={{ padding: 4 }}>
+        <ProfileHeader
+          author={authorDetails?.name || "Unknown Author"}
+          profileUrl={authorDetails?.url || ""}
+          affiliations={authorDetails?.affiliations?.join(", ") || "No affiliation available"}
+          addToCompare={() => console.log(`Add to Compare for ${authorDetails?.name}`)}
+          isSelected={false}
+        />
+      </Box>
 
-      {/* Main Layout */}
-      <Box sx={{ display: "flex", gap: 4, marginTop: 4 }}>
+      {/* Filters */}
+      <Box sx={{ paddingX: 4 }}>
+        <Filters
+          onFilterChange={handleFilterChange}
+          minYear={minYear}
+          maxYear={maxYear}
+          availableVenues={availableVenues}
+        />
+      </Box>
+
+      {/* 3 columns */}
+      <Box sx={{ display: "flex", gap: 4, padding: 4 }}>
         {/* Left Column */}
-        <Box
-          sx={{
-            width: "25%",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
+        <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <AwardsCard />
           <VenuesCard venues={venues} />
-          <CommonTopicsCard />
+          <CommonTopicsCard topics={commonTopics} />
         </Box>
 
-        {/* Middle Column */}
+        {/* Center Column: <ResearchersWork> with tabs for Publications, Repos, HuggingFace */}
         <Box sx={{ width: "50%" }}>
           <ResearchersWork
-            author={authorDetails?.name || ""}
-            authorId={authorId}
+            author={authorDetails?.name || "Unknown Author"}
+            authorId={safeAuthorId}
             filters={activeFilters}
+            publications={filteredPublications}
           />
         </Box>
 
         {/* Right Column */}
-        <Box
-          sx={{
-            width: "25%",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
+        <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <StatisticsCard author={statistics} />
           <CoauthorsSection coauthors={coauthors} />
         </Box>

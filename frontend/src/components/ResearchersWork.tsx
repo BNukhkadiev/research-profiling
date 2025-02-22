@@ -1,17 +1,31 @@
+// src/components/ResearchersWork.tsx
 import React, { useState } from "react";
 import { Tabs, Tab, Box, Typography } from "@mui/material";
 import PublicationsList from "./PublicationsList";
-import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
+
+interface Publication {
+  url: string;
+  title: string;
+  year: number;
+  venue?: string;
+  authors: { name: string; id?: string }[];
+  // etc.
+}
 
 interface ResearchersWorkProps {
   author: string;
   authorId: string;
+  filters: any; 
+  publications: Publication[]; // pass from parent
 }
 
-const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId }) => {
+const ResearchersWork: React.FC<ResearchersWorkProps> = ({
+  author,
+  authorId,
+  filters,
+  publications,
+}) => {
   const [activeTab, setActiveTab] = useState("publications");
-
-  const { data: publications = [], isLoading, isError } = usePublicationsQuery(authorId);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
     setActiveTab(newValue);
@@ -45,23 +59,13 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId }) =
           boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.1)",
         }}
       >
-        {/* Publications Tab */}
         {activeTab === "publications" && (
           <>
-            <Typography
-              variant="h6"
-              sx={{ marginBottom: 2, fontWeight: "bold" }}
-            >
+            <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
               Publications by {author}
             </Typography>
-            {isLoading ? (
-              <Typography variant="body2">Loading publications...</Typography>
-            ) : isError ? (
-              <Typography variant="body2" color="error">
-                Error fetching publications. Please try again later.
-              </Typography>
-            ) : publications.length > 0 ? (
-              <PublicationsList authorId={authorId} />
+            {publications.length > 0 ? (
+              <PublicationsList authorId={authorId} filters={filters} publications={publications} />
             ) : (
               <Typography variant="body2" color="textSecondary">
                 No publications found for {author}.
@@ -70,7 +74,6 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId }) =
           </>
         )}
 
-        {/* Repositories Tab */}
         {activeTab === "repositories" && (
           <Box>
             <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
@@ -82,11 +85,10 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId }) =
           </Box>
         )}
 
-        {/* Hugging Face Models Tab */}
         {activeTab === "huggingface" && (
           <Box>
             <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
-              Models & Datasets by {author}
+            Huggingface by {author}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               This feature is under development.

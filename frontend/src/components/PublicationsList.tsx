@@ -1,123 +1,96 @@
+// src/components/PublicationsList.tsx
 import React, { useState } from "react";
-import { Box, Typography, Button } from "@mui/material";
-import { useNavigate } from "react-router-dom"; // Import useNavigate for navigation
-import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
+import {
+  Box,
+  Typography,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
 
-interface PublicationsListProps {
-  authorId: string;
+interface Publication {
+  url: string;
+  title: string;
+  year: number;
+  venue?: string;
+  authors: { name: string; id?: string }[];
+  // Add other fields if needed
 }
 
-const PublicationsList: React.FC<PublicationsListProps> = ({ authorId }) => {
-  const navigate = useNavigate(); // Initialize navigate
-  const {
-    data: publications = [],
-    isLoading,
-    isError,
-  } = usePublicationsQuery(authorId);
+interface PublicationsListProps {
+  publications: Publication[];
+}
 
-  const [visibleCount, setVisibleCount] = useState(5); // Number of publications to display initially
-
-  if (isLoading) {
-    return (
-      <Typography variant="body1" color="textSecondary">
-        Loading publications...
-      </Typography>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Typography variant="body1" color="error">
-        Failed to load publications.
-      </Typography>
-    );
-  }
+const PublicationsList: React.FC<PublicationsListProps> = ({ publications }) => {
+  const [visibleCount, setVisibleCount] = useState(5);
+  const [selectedPublication, setSelectedPublication] = useState<Publication | null>(null);
 
   if (publications.length === 0) {
-    return (
-      <Typography variant="body1" color="textSecondary">
-        No publications available for this author.
-      </Typography>
-    );
+    return <Typography>No publications available.</Typography>;
   }
 
-  // Increment the number of visible publications
   const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5); // Load 5 more publications
+    setVisibleCount((prev) => prev + 5);
   };
 
-  // Handle navigation to the PublicationDetails page
-  const handleViewDetails = (publicationId: string) => {
-    navigate(`/publication/${publicationId}`);
+  const handleViewDetails = (publication: Publication) => {
+    setSelectedPublication(publication);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedPublication(null);
   };
 
   return (
     <Box>
-      {publications.slice(0, visibleCount).map((publication, index) => (
-        <Box
-          key={index}
-          sx={{
-            padding: 2,
-            marginBottom: 2,
-            border: "1px solid #ddd",
-            borderRadius: 2,
-            backgroundColor: "#f9f9f9",
-          }}
-        >
-          {/* Title */}
-          <Typography variant="h6" gutterBottom>
-            {publication.title || "Untitled Publication"}
-          </Typography>
-
-          {/* Authors */}
-          <Typography variant="body2" color="textSecondary" gutterBottom>
-            {publication.authors.length > 0
-              ? publication.authors.map((author) => author.name).join(", ")
-              : "Unknown Authors"}
-          </Typography>
-
-          {/* Year */}
-          <Typography variant="body2" color="textSecondary" gutterBottom>
-            Year: {publication.year || "Unknown Year"}
-          </Typography>
-
-          {/* Citation Count */}
-          {publication.citationCount !== undefined && (
-            <Typography variant="body2" color="textSecondary" gutterBottom>
-              Citations: {publication.citationCount}
-            </Typography>
-          )}
-
-          {/* Fields of Study */}
-          {publication.fieldsOfStudy && publication.fieldsOfStudy.length > 0 && (
-            <Typography variant="body2" color="textSecondary" gutterBottom>
-              Fields of Study: {publication.fieldsOfStudy.join(", ")}
-            </Typography>
-          )}
-
-          {/* View Details Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleViewDetails(publication.url.split("/").pop() || "")}
-            sx={{ textTransform: "none", marginTop: 1 }}
-          >
+      {publications.slice(0, visibleCount).map((pub) => (
+        <Box key={pub.url} sx={{ padding: 2, border: "1px solid #ddd", marginBottom: 2 }}>
+          <Typography variant="h6">{pub.title}</Typography>
+          <Typography>{pub.venue || "Unknown Venue"}</Typography>
+          <Typography>Year: {pub.year}</Typography>
+          <Button variant="contained" onClick={() => handleViewDetails(pub)}>
             View Details
           </Button>
         </Box>
       ))}
 
-      {/* Load More Button */}
       {visibleCount < publications.length && (
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleLoadMore}
-          sx={{ textTransform: "none", marginTop: 2 }}
-        >
+        <Button variant="contained" onClick={handleLoadMore}>
           Load More
         </Button>
       )}
+
+      {/* Modal for publication details */}
+      <Dialog open={Boolean(selectedPublication)} onClose={handleCloseDetails}>
+        {selectedPublication && (
+          <>
+            <DialogTitle>{selectedPublication.title}</DialogTitle>
+            <DialogContent>
+              <Typography>
+                <strong>Venue:</strong> {selectedPublication.venue || "Unknown Venue"}
+              </Typography>
+              <Typography>
+                <strong>Year:</strong> {selectedPublication.year}
+              </Typography>
+              <Typography>
+                <strong>Authors:</strong>{" "}
+                {selectedPublication.authors.map((a) => a.name).join(", ")}
+              </Typography>
+              <Typography>
+                <strong>URL:</strong>{" "}
+                <a href={selectedPublication.url} target="_blank" rel="noopener noreferrer">
+                  {selectedPublication.url}
+                </a>
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDetails}>Close</Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 };

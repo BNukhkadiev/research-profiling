@@ -1,21 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
-// Define the response type
-interface Author {
+// Define the Author interface
+export interface Author {
   name: string;
-  id: string; // Include author ID
+  id: string;
 }
 
-interface Publication {
+// Define the Publication interface based on your API response
+export interface Publication {
   url: string;
   title: string;
   year: number;
-  authors: Author[]; // Use the updated Author type
+  authors: Author[];
   abstract?: string;
   venue?: string;
   citationCount?: number;
   fieldsOfStudy?: string[];
+  // If you have other known properties, add them here:
+  // e.g. publicationDate?: string;  // "2023-01-15T00:00:00Z"
+  // e.g. somethingElse?: number;
 }
 
 // Fetch function for publications
@@ -27,6 +31,7 @@ const fetchPublications = async (authorId: string): Promise<Publication[]> => {
     }
   );
 
+  // Transform the raw API data into your Publication interface shape
   return (
     response.data?.publications?.map((publication: any) => ({
       url: publication.url,

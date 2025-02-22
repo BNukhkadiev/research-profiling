@@ -1,108 +1,189 @@
-import React, { useState } from "react";
-import { Box, Button, Chip, Menu, MenuItem } from "@mui/material";
-import { DateRangePicker } from "react-date-range";
-import "react-date-range/dist/styles.css"; // main style file
-import "react-date-range/dist/theme/default.css"; // theme css file
+// src/components/Filters.tsx
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Menu,
+  MenuItem,
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  SelectChangeEvent,
+} from "@mui/material";
 
-interface FiltersProps {
-  onFilterChange: (filters: any) => void;
+/** The filter shape we're managing */
+export interface FilterState {
+  startYear: number | null;
+  endYear: number | null;
+  venues: string[];
+  coreRanking: string | null;
+  sort: string | null; // "Newest" or "Oldest"
 }
 
-const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
-  const [filters, setFilters] = useState<{
-    date: string | null;
-    venue: string[];
-    coreRanking: string | null;
-    sort: string | null;
-  }>({
-    date: null,
-    venue: [],
+/** Props for the Filters component */
+interface FiltersProps {
+  onFilterChange: (filters: FilterState) => void;
+  minYear: number | null;       // earliest year to display
+  maxYear: number | null;       // latest year to display
+  availableVenues: string[];    // dynamic list of venues
+}
+
+const Filters: React.FC<FiltersProps> = ({
+  onFilterChange,
+  minYear,
+  maxYear,
+  availableVenues,
+}) => {
+  // Our local filter state
+  const [filters, setFilters] = useState<FilterState>({
+    startYear: null,
+    endYear: null,
+    venues: [],
     coreRanking: null,
     sort: null,
   });
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dateRange, setDateRange] = useState([
-    {
-      startDate: new Date(),
-      endDate: new Date(),
-      key: "selection",
-    },
-  ]);
-
+  // For the menu anchors
+  const [anchorElDate, setAnchorElDate] = useState<null | HTMLElement>(null);
   const [anchorElVenue, setAnchorElVenue] = useState<null | HTMLElement>(null);
-  const [anchorElCoreRanking, setAnchorElCoreRanking] =
-    useState<null | HTMLElement>(null);
   const [anchorElSort, setAnchorElSort] = useState<null | HTMLElement>(null);
+  const [anchorElCoreRanking, setAnchorElCoreRanking] = useState<null | HTMLElement>(null);
 
-  const toggleDatePicker = () => {
-    setShowDatePicker((prev) => !prev);
-  };
-
-  const handleDateChange = (ranges: any) => {
-    setDateRange([ranges.selection]);
-    setFilters((prev) => ({
-      ...prev,
-      date: `${ranges.selection.startDate.toLocaleDateString()} - ${ranges.selection.endDate.toLocaleDateString()}`,
-    }));
-    setShowDatePicker(false);
-    onFilterChange(filters);
-  };
-
-  const handleSelectFilter = (type: string, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [type]: type === "venue" ? [...prev.venue, value] : value,
-    }));
-    onFilterChange(filters);
-  };
-
-  const handleRemoveFilter = (type: string, value?: string) => {
-    if (type === "venue") {
-      setFilters((prev) => ({
-        ...prev,
-        venue: prev.venue.filter((v) => v !== value),
-      }));
-    } else {
-      setFilters((prev) => ({
-        ...prev,
-        [type]: null,
-      }));
+  // Build an array of years from minYear to maxYear
+  // We'll use 0 to represent "(None)"
+  const yearOptions: number[] = [];
+  if (minYear !== null && maxYear !== null) {
+    for (let y = minYear; y <= maxYear; y++) {
+      yearOptions.push(y);
     }
+  }
+
+  // Whenever local filters change, notify the parent
+  useEffect(() => {
     onFilterChange(filters);
+  }, [filters, onFilterChange]);
+
+  /** Handler for the Start Year dropdown */
+  const handleStartYearChange = (event: SelectChangeEvent<number>) => {
+    const selected = event.target.value as number;
+    if (selected === 0) {
+      // 0 => means no start year
+      setFilters((prev) => ({ ...prev, startYear: null }));
+    } else {
+      setFilters((prev) => ({ ...prev, startYear: selected }));
+    }
   };
 
-  const handleClearAll = () => {
-    setFilters({ date: null, venue: [], coreRanking: null, sort: null });
-    onFilterChange(filters);
+  /** Handler for the End Year dropdown */
+  const handleEndYearChange = (event: SelectChangeEvent<number>) => {
+    const selected = event.target.value as number;
+    if (selected === 0) {
+      // 0 => means no end year
+      setFilters((prev) => ({ ...prev, endYear: null }));
+    } else {
+      setFilters((prev) => ({ ...prev, endYear: selected }));
+    }
+  };
+
+  /** Handler for selecting a venue */
+  const handleVenueSelect = (venue: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      venues: [...new Set([...prev.venues, venue])],
+    }));
+    setAnchorElVenue(null);
+  };
+
+  /** Handler for selecting sort order */
+  const handleSortSelect = (sortOption: string) => {
+    setFilters((prev) => ({ ...prev, sort: sortOption }));
+    setAnchorElSort(null);
+  };
+
+  /** Handler for selecting a core ranking */
+  const handleCoreRankingSelect = (ranking: string) => {
+    setFilters((prev) => ({ ...prev, coreRanking: ranking }));
+    setAnchorElCoreRanking(null);
+  };
+
+  /** Remove an active filter via Chips */
+  const handleRemoveFilter = (filterKey: keyof FilterState, value?: string) => {
+    if (filterKey === "venues" && value) {
+      // Remove that venue from the array
+      setFilters((prev) => ({
+        ...prev,
+        venues: prev.venues.filter((v) => v !== value),
+      }));
+    } else if (filterKey === "coreRanking") {
+      setFilters((prev) => ({ ...prev, coreRanking: null }));
+    } else if (filterKey === "sort") {
+      setFilters((prev) => ({ ...prev, sort: null }));
+    } else if (filterKey === "startYear") {
+      setFilters((prev) => ({ ...prev, startYear: null }));
+    } else if (filterKey === "endYear") {
+      setFilters((prev) => ({ ...prev, endYear: null }));
+    }
   };
 
   return (
-    <Box>
+    <Box sx={{ marginTop: 2, marginBottom: 2 }}>
       {/* Filter Buttons */}
-      <Box sx={{ display: "flex", gap: 2, marginBottom: 2 }}>
-        <Button variant="outlined" onClick={toggleDatePicker}>
-          Date
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={(e) => setAnchorElVenue(e.currentTarget)}
-        >
-          Venue
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={(e) => setAnchorElCoreRanking(e.currentTarget)}
-        >
-          CORE Ranking
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={(e) => setAnchorElSort(e.currentTarget)}
-        >
-          Sort
-        </Button>
-      </Box>
+      <Button variant="outlined" onClick={(e) => setAnchorElDate(e.currentTarget)}>
+        Date
+      </Button>
+      <Button variant="outlined" onClick={(e) => setAnchorElVenue(e.currentTarget)}>
+        Venue
+      </Button>
+      <Button variant="outlined" onClick={(e) => setAnchorElSort(e.currentTarget)}>
+        Sort
+      </Button>
+      <Button variant="outlined" onClick={(e) => setAnchorElCoreRanking(e.currentTarget)}>
+        Core Ranking
+      </Button>
+
+      {/* Date Menu => Two dropdowns for startYear & endYear */}
+      <Menu
+        anchorEl={anchorElDate}
+        open={Boolean(anchorElDate)}
+        onClose={() => setAnchorElDate(null)}
+      >
+        <Box sx={{ padding: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+          {/* Start Year */}
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel>Start Year</InputLabel>
+            <Select<number>
+              label="Start Year"
+              value={filters.startYear === null ? 0 : filters.startYear}
+              onChange={handleStartYearChange}
+            >
+              <MenuItem value={0}>(None)</MenuItem>
+              {yearOptions.map((year) => (
+                <MenuItem key={year} value={year}>
+                  {year}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* End Year */}
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel>End Year</InputLabel>
+            <Select<number>
+              label="End Year"
+              value={filters.endYear === null ? 0 : filters.endYear}
+              onChange={handleEndYearChange}
+            >
+              <MenuItem value={0}>(None)</MenuItem>
+              {yearOptions.map((year) => (
+                <MenuItem key={year} value={year}>
+                  {year}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+      </Menu>
 
       {/* Venue Menu */}
       <Menu
@@ -110,34 +191,9 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
         open={Boolean(anchorElVenue)}
         onClose={() => setAnchorElVenue(null)}
       >
-        {["ICML 2024", "SIGGRAPH", "CHI", "Nature"].map((venue) => (
-          <MenuItem
-            key={venue}
-            onClick={() => {
-              handleSelectFilter("venue", venue);
-              setAnchorElVenue(null);
-            }}
-          >
+        {availableVenues.map((venue) => (
+          <MenuItem key={venue} onClick={() => handleVenueSelect(venue)}>
             {venue}
-          </MenuItem>
-        ))}
-      </Menu>
-
-      {/* CORE Ranking Menu */}
-      <Menu
-        anchorEl={anchorElCoreRanking}
-        open={Boolean(anchorElCoreRanking)}
-        onClose={() => setAnchorElCoreRanking(null)}
-      >
-        {["A*", "A", "B", "C", "Australasian B"].map((ranking) => (
-          <MenuItem
-            key={ranking}
-            onClick={() => {
-              handleSelectFilter("coreRanking", ranking);
-              setAnchorElCoreRanking(null);
-            }}
-          >
-            {ranking}
           </MenuItem>
         ))}
       </Menu>
@@ -149,63 +205,62 @@ const Filters: React.FC<FiltersProps> = ({ onFilterChange }) => {
         onClose={() => setAnchorElSort(null)}
       >
         {["Newest", "Oldest"].map((sortOption) => (
-          <MenuItem
-            key={sortOption}
-            onClick={() => {
-              handleSelectFilter("sort", sortOption);
-              setAnchorElSort(null);
-            }}
-          >
+          <MenuItem key={sortOption} onClick={() => handleSortSelect(sortOption)}>
             {sortOption}
           </MenuItem>
         ))}
       </Menu>
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        <Box sx={{ marginBottom: 2 }}>
-          <DateRangePicker
-            ranges={dateRange}
-            onChange={handleDateChange}
-            moveRangeOnFirstSelection={false}
-          />
-        </Box>
-      )}
+      {/* Core Ranking Menu */}
+      <Menu
+        anchorEl={anchorElCoreRanking}
+        open={Boolean(anchorElCoreRanking)}
+        onClose={() => setAnchorElCoreRanking(null)}
+      >
+        {["A*", "A", "B", "C"].map((ranking) => (
+          <MenuItem key={ranking} onClick={() => handleCoreRankingSelect(ranking)}>
+            {ranking}
+          </MenuItem>
+        ))}
+      </Menu>
 
-      {/* Active Filters */}
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", marginBottom: 2 }}>
-        {filters.date && (
+      {/* Active Filters as Chips */}
+      <Box sx={{ marginTop: 2, display: "flex", gap: 1, flexWrap: "wrap" }}>
+        {/* If we have a startYear, show a chip */}
+        {filters.startYear !== null && (
           <Chip
-            label={`Date: ${filters.date}`}
-            onDelete={() => handleRemoveFilter("date")}
+            label={`Start: ${filters.startYear}`}
+            onDelete={() => handleRemoveFilter("startYear")}
           />
         )}
-        {filters.venue.map((v) => (
+        {/* If we have an endYear, show a chip */}
+        {filters.endYear !== null && (
           <Chip
-            key={v}
-            label={`Venue: ${v}`}
-            onDelete={() => handleRemoveFilter("venue", v)}
+            label={`End: ${filters.endYear}`}
+            onDelete={() => handleRemoveFilter("endYear")}
+          />
+        )}
+        {/* Venues */}
+        {filters.venues.map((venue) => (
+          <Chip
+            key={venue}
+            label={`Venue: ${venue}`}
+            onDelete={() => handleRemoveFilter("venues", venue)}
           />
         ))}
+        {/* Core Ranking */}
         {filters.coreRanking && (
           <Chip
-            label={`CORE Ranking: ${filters.coreRanking}`}
+            label={`Core Ranking: ${filters.coreRanking}`}
             onDelete={() => handleRemoveFilter("coreRanking")}
           />
         )}
+        {/* Sort */}
         {filters.sort && (
           <Chip
             label={`Sort: ${filters.sort}`}
             onDelete={() => handleRemoveFilter("sort")}
           />
-        )}
-        {(filters.date ||
-          filters.venue.length ||
-          filters.coreRanking ||
-          filters.sort) && (
-          <Button onClick={handleClearAll} color="secondary">
-            Clear All
-          </Button>
         )}
       </Box>
     </Box>
