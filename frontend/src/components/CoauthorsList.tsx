@@ -10,11 +10,12 @@ import { Typography } from "@mui/material";
 
 interface Coauthor {
   name: string;
-  id: string;
+  pid: string;
+  publicationsTogether: number;
 }
 
 interface CoauthorsListProps {
-  coauthors: Coauthor[]; // Accept an array of coauthors as props
+  coauthors: Coauthor[];
 }
 
 const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
@@ -23,7 +24,7 @@ const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
       sx={{
         padding: 3,
         borderRadius: "8px",
-        backgroundColor: "#FFFF", // Light background
+        backgroundColor: "#FFF",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -35,23 +36,29 @@ const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
       </Typography>
       <List>
         {coauthors.length > 0 ? (
-          coauthors.map((coauthor, index) => (
-            <ListItem key={index} sx={{ padding: "8px 0" }}>
-              <ListItemIcon>
-                <PersonIcon sx={{ color: "#1976d2" }} />
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Link
-                    to={`/profile/${coauthor.id}`}
-                    style={{ textDecoration: "none", color: "#1976d2" }}
-                  >
-                    {coauthor.name}
-                  </Link>
-                }
-              />
-            </ListItem>
-          ))
+          coauthors.map((coauthor, index) => {
+            const encodedPid = encodeURIComponent(coauthor.pid);
+            return (
+              <ListItem key={index} sx={{ padding: "8px 0" }}>
+                <ListItemIcon>
+                  <PersonIcon sx={{ color: "#1976d2" }} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <>
+                      <Link
+                        to={`/profile/${encodedPid}`}
+                        style={{ textDecoration: "none", color: "#1976d2" }}
+                      >
+                        {coauthor.name}
+                      </Link>
+                      {" "}- {coauthor.publicationsTogether} papers
+                    </>
+                  }
+                />
+              </ListItem>
+            );
+          })
         ) : (
           <Typography variant="body2" color="textSecondary">
             No coauthors available.

@@ -4,16 +4,18 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
-import SearchCard from "../components/SearchCard"; // For researcher results
-import PublicationCard from "../components/PublicationCard"; // For publication results
+import SearchCard from "../components/SearchCard"; // Researcher card
+import PublicationCard from "../components/PublicationCard"; // Publication card
 import { useResearchersQuery } from "../react-query/useResearchersQuery";
 import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
 
-// Define types for API response
+// Define types based on updated API response
 interface Researcher {
   name: string;
-  url: string;
-  affiliations: string[]; // Add affiliations to the Researcher type
+  affiliations: string[];
+  pid: string;
+  dblp_url: string;
+  abstract: string;
 }
 
 interface Publication {
@@ -28,51 +30,46 @@ const SearchResultsPage: React.FC = () => {
   const navigate = useNavigate();
   const initialQuery = searchParams.get("query") || "";
   const [query, setQuery] = useState(initialQuery);
-  const [searchQuery, setSearchQuery] = useState(initialQuery); // Query for API calls
-  const [activeTab, setActiveTab] = useState<"researchers" | "publications">(
-    "researchers"
-  );
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [activeTab, setActiveTab] = useState<"researchers" | "publications">("researchers");
   const [selectedResearchers, setSelectedResearchers] = useState<string[]>([]);
 
+  // Fetch researchers based on search query
   const { data: researchers = [], isLoading: loadingResearchers } =
     useResearchersQuery(activeTab === "researchers" ? searchQuery : "");
+
+  // Fetch publications for the first selected researcher
   const { data: publications = [], isLoading: loadingPublications } =
     usePublicationsQuery(
       activeTab === "publications" && selectedResearchers.length
-        ? selectedResearchers[0]
+        ? selectedResearchers[0] // Use the first selected researcher
         : ""
-    ); // Fetch publications for the first selected researcher
+    );
 
+  // Trigger search
   const handleSearch = () => {
     setSearchQuery(query);
     navigate(`?query=${query}`);
   };
 
-  const handleAddToCompare = (author: string) => {
+  // Add/remove researcher from comparison list
+  const handleAddToCompare = (pid: string) => {
     setSelectedResearchers((prev) =>
-      prev.includes(author)
-        ? prev.filter((name) => name !== author)
-        : [...prev, author]
+      prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid]
     );
   };
 
-  const handleViewProfile = (
-    authorName: string,
-    profileUrl: string,
-    affiliations: string[]
-  ) => {
-    const authorId = profileUrl.split("/").pop(); // Extract the author ID from the URL
-    const affiliation = affiliations.length > 0 ? affiliations[0] : "Unknown";
-    navigate(`/profile/${authorId}/${encodeURIComponent(affiliation)}`, {
-      state: { authorName, authorId },
-    });
+  // Navigate to profile page using `pid`
+  const handleViewProfile = (pid: string) => {
+    navigate(`/profile/${encodeURIComponent(pid)}`);
   };
 
+  // Navigate to comparison page
   const handleGetToComparison = () => {
-    // Navigate to a comparison page with selected researchers
     navigate(`/comparison?authors=${selectedResearchers.join(",")}`);
   };
 
+  // Handle Enter key for search
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter" && query.trim()) {
       handleSearch();
@@ -91,16 +88,12 @@ const SearchResultsPage: React.FC = () => {
           onKeyDown={handleKeyDown} // Trigger search on Enter key
           sx={{ flexGrow: 1, marginRight: 2 }}
         />
-        <Button
-          variant="contained"
-          onClick={handleSearch}
-          disabled={query.trim() === ""}
-        >
+        <Button variant="contained" onClick={handleSearch} disabled={query.trim() === ""}>
           Search
         </Button>
       </Box>
 
-      {/* Tabs */}
+      {/* Tabs for Researchers / Publications */}
       <Box sx={{ display: "flex", gap: 2, marginBottom: 2 }}>
         <Button
           variant={activeTab === "researchers" ? "contained" : "outlined"}
@@ -111,13 +104,13 @@ const SearchResultsPage: React.FC = () => {
         <Button
           variant={activeTab === "publications" ? "contained" : "outlined"}
           onClick={() => setActiveTab("publications")}
-          disabled={selectedResearchers.length === 0} // Disable if no researcher selected
+          disabled={selectedResearchers.length === 0} // Disable if no researcher is selected
         >
           Publications
         </Button>
       </Box>
 
-      {/* Get to Comparison */}
+      {/* Get to Comparison Button */}
       {activeTab === "researchers" && (
         <Box sx={{ marginBottom: 3, textAlign: "right" }}>
           <Button
@@ -130,35 +123,31 @@ const SearchResultsPage: React.FC = () => {
         </Box>
       )}
 
-      {/* Results */}
+      {/* Display Results */}
       {loadingResearchers || loadingPublications ? (
         <Typography>Loading...</Typography>
       ) : (
         <Box>
           {activeTab === "researchers"
-            ? researchers.map((researcher: Researcher, index: number) => (
+            ? researchers.map((researcher: Researcher) => (
                 <SearchCard
-                  key={`${researcher.url}-${index}`} // Ensure unique keys
+                  key={researcher.pid} // Use PID as key
                   name={researcher.name}
-                  affiliations={researcher.affiliations} // Pass affiliations to SearchCard
-                  profileUrl={researcher.url}
-                  addToCompare={() => handleAddToCompare(researcher.name)}
-                  isSelected={selectedResearchers.includes(researcher.name)}
-                  onViewProfile={() =>
-                    handleViewProfile(
-                      researcher.name,
-                      researcher.url,
-                      researcher.affiliations
-                    )
-                  }
+                  affiliations={researcher.affiliations}
+                  pid={researcher.pid} // Pass PID for profile navigation
+                  dblp_url={researcher.dblp_url} // Keep DBLP profile link
+                  abstract={researcher.abstract} // Pass abstract
+                  addToCompare={() => handleAddToCompare(researcher.pid)}
+                  isSelected={selectedResearchers.includes(researcher.pid)}
+                  onViewProfile={() => handleViewProfile(researcher.pid)} // Ensure navigation works
                 />
               ))
             : publications.map((publication: Publication, index: number) => (
                 <PublicationCard
                   key={`${publication.url}-${index}`} // Ensure unique keys
                   title={publication.title}
-                  authors={publication.authors.map((author) => author.name)} // Flatten authors
-                  venue={publication.year.toString()}
+                  authors={publication.authors.map((author) => author.name)} // Flatten authors array
+                  venue={publication.year.toString()} // Convert year to string
                   url={publication.url}
                 />
               ))}

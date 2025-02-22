@@ -7,8 +7,12 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import TopicIcon from "@mui/icons-material/Topic";
 
+export interface CommonTopicStats {
+  [topic: string]: number; // Topic name as key, count as value
+}
+
 interface CommonTopicsCardProps {
-  topics: string[];
+  topics: CommonTopicStats[]; // Array of objects with topic name and count
 }
 
 const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
@@ -31,21 +35,29 @@ const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
       >
         Common Topics
       </Typography>
-      {topics.length === 0 ? (
-        <Typography variant="body2" color="textSecondary">
-          No topics found for these filters.
-        </Typography>
-      ) : (
+      {topics.length > 0 ? (
         <List>
-          {topics.map((topic) => (
-            <ListItem key={topic} sx={{ padding: 0 }}>
-              <ListItemIcon>
-                <TopicIcon sx={{ color: "#1976d2" }} />
-              </ListItemIcon>
-              <ListItemText primary={topic} sx={{ color: "#555" }} />
-            </ListItem>
-          ))}
+          {topics.map((topicObj, index) => {
+            const topic = Object.keys(topicObj)[0]; // Extract topic name
+            const count = topicObj[topic]; // Extract count
+
+            return (
+              <ListItem key={index} sx={{ padding: 0 }}>
+                <ListItemIcon>
+                  <TopicIcon sx={{ color: "#1976d2" }} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={`${topic} (${count})`} // Display topic name and count
+                  sx={{ color: "#555" }}
+                />
+              </ListItem>
+            );
+          })}
         </List>
+      ) : (
+        <Typography variant="body2" color="textSecondary">
+          No topics available.
+        </Typography>
       )}
     </Box>
   );

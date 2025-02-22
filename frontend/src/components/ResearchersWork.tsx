@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import { Tabs, Tab, Box, Typography } from "@mui/material";
 import PublicationsList from "./PublicationsList";
-
 interface Publication {
   url: string;
   title: string;
@@ -19,7 +18,7 @@ interface ResearchersWorkProps {
   publications: Publication[]; // pass from parent
 }
 
-const ResearchersWork: React.FC<ResearchersWorkProps> = ({
+export const ResearchersWork: React.FC<ResearchersWorkProps> = ({
   author,
   authorId,
   filters,
@@ -65,7 +64,7 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({
               Publications by {author}
             </Typography>
             {publications.length > 0 ? (
-              <PublicationsList authorId={authorId} filters={filters} publications={publications} />
+              <PublicationsList filters={filters} publications={publications} />
             ) : (
               <Typography variant="body2" color="textSecondary">
                 No publications found for {author}.
@@ -99,5 +98,3 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({
     </Box>
   );
 };
-
-export default ResearchersWork;

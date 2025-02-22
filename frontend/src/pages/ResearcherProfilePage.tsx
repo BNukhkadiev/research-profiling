@@ -1,66 +1,39 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Box, Typography } from "@mui/material";
-import { useAuthorDetailsQuery } from "../react-query/useAuthorDetailsQuery";
-import { usePublicationsQuery } from "../react-query/usePublicationsQuery";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import ProfileHeader from "../components/ProfileHeader";
 import AwardsCard from "../components/AwardsCard";
-import VenuesCard from "../components/VenuesCard";
-import CommonTopicsCard from "../components/CommonTopicsCard";
+import VenuesCard, { VenueData } from "../components/VenuesCard";
+import CommonTopicsCard, {CommonTopicStats} from "../components/CommonTopicsCard";
 import Filters, { FilterState } from "../components/Filters";
 import StatisticsCard from "../components/StatisticsCard";
 import CoauthorsSection from "../components/CoauthorsSection";
+import { ResearchersWork } from "../components/ResearchersWork";
+import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery";
+// If you have a dictionary-based ranking, import getCoreRanking
 import { getCoreRanking } from "../utilities/coreRankings";
-import ResearchersWork from "../components/ResearchersWork";
 
-// Example interfaces
-interface Publication {
-  url: string;
+/** Minimal shape for each "Paper" from the API. Adjust as needed. */
+interface Paper {
+  [x: string]: any;
   title: string;
   year: number;
   venue?: string;
-  citationCount?: number;
-  topics?: string[];
-  authors: { name: string; id?: string }[];
+  // etc...
 }
 
 interface Coauthor {
   name: string;
-  id: string;
-}
-
-interface VenueData {
-  name: string;
-  papers: number;
-  ranking?: string;
+  pid: string;
+  publicationsTogether: number;
 }
 
 const ResearcherProfilePage: React.FC = () => {
-  const { authorId } = useParams<{ authorId?: string }>();
-  const safeAuthorId = authorId ?? "UnknownAuthor";
+  const { pid } = useParams<{ pid: string }>();
+  const encodedPid = pid ? encodeURIComponent(pid) : "";
 
-  // 1) Fetch author details
-  const {
-    data: authorDetails,
-    isLoading: loadingAuthorDetails,
-    isError: errorAuthorDetails,
-  } = useAuthorDetailsQuery(safeAuthorId);
-
-  // 2) Fetch all publications
-  const {
-    data: allPublications = [],
-    isLoading: loadingPublications,
-    isError: errorPublications,
-  } = usePublicationsQuery<Publication[]>(safeAuthorId);
-
-  // For bounding the year-based filter
-  const [minYear, setMinYear] = useState<number | null>(null);
-  const [maxYear, setMaxYear] = useState<number | null>(null);
-
-  // For dynamic venue filter
-  const [availableVenues, setAvailableVenues] = useState<string[]>([]);
-
-  // The user's chosen filters
+  // 1) universal filter state
   const [activeFilters, setActiveFilters] = useState<FilterState>({
     startYear: null,
     endYear: null,
@@ -69,135 +42,159 @@ const ResearcherProfilePage: React.FC = () => {
     sort: null,
   });
 
-  // Filtered publications
-  const [filteredPublications, setFilteredPublications] = useState<Publication[]>([]);
+  // 2) final filtered list of papers
+  const [filteredPapers, setFilteredPapers] = useState<Paper[]>([]);
 
-  // Derived data
+  // derived data from the filtered set
   const [venues, setVenues] = useState<VenueData[]>([]);
   const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
-  const [commonTopics, setCommonTopics] = useState<string[]>([]);
+  const [topics, setTopics] = useState<CommonTopicStats[]>([]);
 
-  // A) minYear, maxYear, availableVenues
+  // For bounding year filter
+  const [minYear, setMinYear] = useState<number | null>(null);
+  const [maxYear, setMaxYear] = useState<number | null>(null);
+  const [availableVenues, setAvailableVenues] = useState<string[]>([]);
+
+  // 3) fetch the researcher profile
+  const {
+    data: researcherProfile,
+    isLoading: loadingProfile,
+    isError: errorProfile,
+  } = useResearcherProfileQuery(encodedPid);
+
+  // We assume researcherProfile?.papers is our main array
+  // We'll do bounding date logic on that.
+
+  /** A) Once we have `researcherProfile` or `papers`, define minYear, maxYear, availableVenues. */
   useEffect(() => {
-    if (!allPublications.length) {
+    if (!researcherProfile?.papers?.length) {
       setMinYear(null);
       setMaxYear(null);
       setAvailableVenues([]);
       return;
     }
-    const years = allPublications.map((p) => p.year);
+    const years = researcherProfile.papers.map((p) => p.year);
     setMinYear(Math.min(...years));
     setMaxYear(Math.max(...years));
 
     const venueSet = new Set<string>();
-    allPublications.forEach((pub) => {
-      if (pub.venue) {
-        venueSet.add(pub.venue);
+    researcherProfile.papers.forEach((p) => {
+      if (p.venue) {
+        venueSet.add(p.venue);
       }
     });
     setAvailableVenues(Array.from(venueSet));
-  }, [allPublications]);
+  }, [researcherProfile]);
 
-  // B) Filter logic
+  /** B) Filter logic: from `researcherProfile?.papers` => filteredPapers */
   useEffect(() => {
-    if (!allPublications.length) {
-      setFilteredPublications([]);
+    if (!researcherProfile?.papers?.length) {
+      setFilteredPapers([]);
       return;
     }
-    let temp = [...allPublications];
+    let temp = [...researcherProfile.papers];
 
-    // 1) Year-based filter
+    // 1) year-based filter
     if (activeFilters.startYear !== null && activeFilters.endYear !== null) {
       temp = temp.filter(
-        (pub) => pub.year >= activeFilters.startYear! && pub.year <= activeFilters.endYear!
+        (paper) =>
+          paper.year >= activeFilters.startYear! &&
+          paper.year <= activeFilters.endYear!
       );
     }
 
-    // 2) Venues
+    // 2) venue filter
     if (activeFilters.venues.length > 0) {
       temp = temp.filter(
-        (pub) => pub.venue && activeFilters.venues.includes(pub.venue)
+        (paper) => paper.venue && activeFilters.venues.includes(paper.venue)
       );
     }
 
-    // 3) Core ranking
+    // 3) core ranking filter (if you want dictionary-based approach)
     if (activeFilters.coreRanking) {
-      temp = temp.filter((pub) => {
-        const rank = getCoreRanking(pub.venue);
+      temp = temp.filter((paper) => {
+        const rank = getCoreRanking(paper.venue);
         return rank === activeFilters.coreRanking;
       });
     }
 
-    // 4) Sort
+    // 4) sort
     if (activeFilters.sort === "Newest") {
       temp.sort((a, b) => b.year - a.year);
     } else if (activeFilters.sort === "Oldest") {
       temp.sort((a, b) => a.year - b.year);
     }
 
-    setFilteredPublications(temp);
-  }, [allPublications, activeFilters]);
+    setFilteredPapers(temp);
+  }, [researcherProfile, activeFilters]);
 
-  // C) Derive Venues, Coauthors, Topics
+  /** C) Derive Venues, Coauthors, Topics from filteredPapers */
   useEffect(() => {
-    if (!filteredPublications.length) {
+    if (!filteredPapers.length) {
       setVenues([]);
       setCoauthors([]);
-      setCommonTopics([]);
+      setTopics([]);
       return;
     }
 
-    const venueMap: Record<string, { papers: number; ranking?: string }> = {};
-    const coauthorMap: Record<string, Coauthor> = {};
-    const topicMap: Record<string, number> = {};
-
-    filteredPublications.forEach((pub) => {
-      // Venues
-      if (pub.venue) {
-        const rank = getCoreRanking(pub.venue);
-        if (!venueMap[pub.venue]) {
-          venueMap[pub.venue] = { papers: 0, ranking: rank };
+    // 1) venues
+    const venueMap: Record<string, { count: number; rank?: string }> = {};
+    filteredPapers.forEach((p) => {
+      if (p.venue) {
+        const rank = getCoreRanking(p.venue);
+        if (!venueMap[p.venue]) {
+          venueMap[p.venue] = { count: 0, rank };
         }
-        venueMap[pub.venue].papers += 1;
-      }
-
-      // Coauthors
-      pub.authors.forEach((author) => {
-        if (author.id !== safeAuthorId) {
-          const coKey = author.id || author.name;
-          coauthorMap[coKey] = { name: author.name, id: coKey };
-        }
-      });
-
-      // Topics
-      if (pub.topics) {
-        pub.topics.forEach((topic) => {
-          if (!topicMap[topic]) topicMap[topic] = 0;
-          topicMap[topic]++;
-        });
+        venueMap[p.venue].count++;
       }
     });
-
-    const newVenues = Object.entries(venueMap).map(([name, data]) => ({
+    const newVenues: VenueData[] = Object.entries(venueMap).map(([name, data]) => ({
       name,
-      papers: data.papers,
-      ranking: data.ranking,
+      count: data.count,
+      coreRank: data.rank || '',
     }));
-
     setVenues(newVenues);
+
+    // 2) coauthors
+    const coauthorMap: Record<string, Coauthor> = {};
+    filteredPapers.forEach((paper) => {
+      // if each paper has authors with { name, id }, do:
+      paper.authors.forEach((author: { id: string | undefined; name: any; }) => {
+        if (author.id !== pid) {
+          const coKey = author.id || author.name;
+          if (!coauthorMap[coKey]) {
+            coauthorMap[coKey] = {
+              name: author.name,
+              pid: author.id || "",
+              publicationsTogether: 0,
+            };
+          }
+          coauthorMap[coKey].publicationsTogether++;
+        }
+      });
+    });
     setCoauthors(Object.values(coauthorMap));
 
-    const sortedTopics = Object.keys(topicMap).sort((a, b) => topicMap[b] - topicMap[a]);
-    setCommonTopics(sortedTopics);
-  }, [filteredPublications, safeAuthorId]);
-
-  // D) Handle filter updates
+    // 3) topics
+    const topicMap: Record<string, number> = {};
+    filteredPapers.forEach((paper) => {
+      // if paper has paper.topics = string[]
+      paper.topics?.forEach((topic: string | number) => {
+        if (!topicMap[topic]) topicMap[topic] = 0;
+        topicMap[topic]++;
+      });
+    });
+    const sortedTopics = Object.entries(topicMap).sort((a, b) => b[1] - a[1]);
+    const finalTopics: CommonTopicStats[] = sortedTopics.map(([name, count]) => ({ [name]: count }));
+    setTopics(finalTopics);
+  }, [filteredPapers, pid]);
+  /** D) handle filter changes from <Filters> */
   const handleFilterChange = (filters: FilterState) => {
     setActiveFilters(filters);
   };
 
-  // Loading states
-  if (!authorId) {
+  // loading / error states
+  if (!pid) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4" color="error">
@@ -206,78 +203,83 @@ const ResearcherProfilePage: React.FC = () => {
       </Box>
     );
   }
-  if (loadingAuthorDetails || loadingPublications) {
+  if (loadingProfile) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4">Loading data...</Typography>
       </Box>
     );
   }
-  if (errorAuthorDetails || errorPublications) {
+  if (errorProfile) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4" color="error">
-          Failed to load data.
+          Failed to fetch researcher profile. Please try again later.
         </Typography>
       </Box>
     );
   }
 
-  // Example stats
+  // example stats
   const statistics = {
-    papers: authorDetails?.paperCount || filteredPublications.length,
-    citations: authorDetails?.citationCount || 0,
-    hIndex: authorDetails?.hIndex || 0,
-    gIndex: 0,
+    papers: researcherProfile?.totalPapers || filteredPapers.length,
+    citations: researcherProfile?.totalCitations || 0,
+    hIndex: researcherProfile?.hIndex || 0,
+    gIndex: researcherProfile?.gIndex || 0,
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", backgroundColor: "#f5f7fa" }}>
-      {/* (Removed the second Mannheim View heading) */}
+    <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
+      {/* universal Filters */}
+      <Filters
+        onFilterChange={handleFilterChange}
+        minYear={minYear}
+        maxYear={maxYear}
+        availableVenues={availableVenues}
+      />
 
       {/* Profile Header */}
-      <Box sx={{ padding: 4 }}>
-        <ProfileHeader
-          author={authorDetails?.name || "Unknown Author"}
-          profileUrl={authorDetails?.url || ""}
-          affiliations={authorDetails?.affiliations?.join(", ") || "No affiliation available"}
-          addToCompare={() => console.log(`Add to Compare for ${authorDetails?.name}`)}
-          isSelected={false}
-        />
-      </Box>
+      <ProfileHeader
+        author={researcherProfile?.name || "Unknown Author"}
+        profileUrl={`https://dblp.org/pid/${pid}`}
+        affiliations={
+          researcherProfile?.affiliations?.join(", ") ||
+          "Affiliations not available"
+        }
+        addToCompare={() =>
+          console.log(`Add to Compare Clicked for ${researcherProfile?.name}`)
+        }
+        isSelected={false}
+      />
 
-      {/* Filters */}
-      <Box sx={{ paddingX: 4 }}>
-        <Filters
-          onFilterChange={handleFilterChange}
-          minYear={minYear}
-          maxYear={maxYear}
-          availableVenues={availableVenues}
-        />
-      </Box>
-
-      {/* 3 columns */}
-      <Box sx={{ display: "flex", gap: 4, padding: 4 }}>
+      {/* Layout: 3 columns */}
+      <Box sx={{ display: "flex", gap: 4, marginTop: 4 }}>
         {/* Left Column */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <AwardsCard />
+          {/* We pass derived `venues` from filteredPapers */}
           <VenuesCard venues={venues} />
-          <CommonTopicsCard topics={commonTopics} />
+          {/* We pass derived `topics` from filteredPapers */}
+          <CommonTopicsCard topics={topics} />
         </Box>
 
-        {/* Center Column: <ResearchersWork> with tabs for Publications, Repos, HuggingFace */}
+        {/* Center Column */}
         <Box sx={{ width: "50%" }}>
+          {/* We pass final filteredPapers to <ResearchersWork> */}
           <ResearchersWork
-            author={authorDetails?.name || "Unknown Author"}
-            authorId={safeAuthorId}
-            filters={activeFilters}
-            publications={filteredPublications}
-          />
+            author={researcherProfile?.name || ""}
+            authorId={pid}
+            publications={filteredPapers.map(paper => ({
+              ...paper,
+              url: paper.url || '',
+              authors: paper.authors || []
+            }))} filters={undefined}          />
         </Box>
 
         {/* Right Column */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <StatisticsCard author={statistics} />
+          {/* We pass derived `coauthors` from filteredPapers */}
           <CoauthorsSection coauthors={coauthors} />
         </Box>
       </Box>

@@ -1,4 +1,3 @@
-// src/components/PublicationsList.tsx
 import React, { useState } from "react";
 import {
   Box,
@@ -21,7 +20,9 @@ interface Publication {
 
 interface PublicationsListProps {
   publications: Publication[];
+  filters: any; // Change 'any' to your actual FilterState type if available
 }
+
 
 const PublicationsList: React.FC<PublicationsListProps> = ({ publications }) => {
   const [visibleCount, setVisibleCount] = useState(5);
