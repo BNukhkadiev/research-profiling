@@ -20,7 +20,7 @@ import urllib.parse
 from collections import Counter, defaultdict
 import pandas as pd
 
-from .models import Author  # Import your MongoEngine model
+from .models import Author , Publication # Import your MongoEngine model
 
 
 
@@ -444,12 +444,25 @@ class ResearcherProfileView(APIView):
             affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
 
             publications = []
+
+
+            # Fetch or create the Author doc
+            author_doc = Author.objects(pid=pid).first()
+            if not author_doc:
+                author_doc = Author(pid=pid)
+            author_doc.name = name
+            author_doc.affiliations = affiliations
+
+
             venue_counts = {}  # Count occurrences of each venue
             coauthors_dict = defaultdict(int)  # Store coauthor names with count of coauthored papers
             coauthor_pids = {}  # Store PID of coauthors
             topic_counts = Counter()
             venues_list = []
 
+
+
+            pub_list = []
             for pub in root.findall(".//r"):
                 publ_info = pub.find("./*")
                 if publ_info is not None:
@@ -499,16 +512,23 @@ class ResearcherProfileView(APIView):
 
                     topic_counts.update(topics)
 
-                    publications.append({
-                        "title": title,
-                        "year": year,
-                        "type": paper_type,
-                        "venue": venue,
-                        "citations": 0,  # Placeholder
-                        "topics": topics,
-                        "authors": paper_authors,
-                        "links": links
-                    })
+                    # Assign the list of embedded publications to the Author
+                    author_doc.publications = pub_list
+
+                    # Save or update author
+                    author_doc.save()
+
+                    # Build the embedded Publication object
+                    publication = Publication(
+                        title=title,
+                        year=year,
+                        paper_type=paper_type,
+                        venue=venue,
+                        citations=0,
+                        topics=[],
+                        links=links
+                    )
+                    pub_list.append(publication)
 
             venue_ranks = {venue: fuzzy_match(core_data, venue, 'name', 'abbreviation') for venue in venues_list}
 
