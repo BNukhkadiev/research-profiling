@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 
+import mongoengine
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -140,3 +142,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+mongoengine.connect(
+    db='myDatabase',                  # Your MongoDB database name
+    host='mongodb://localhost:27017', # Your MongoDB URI
+    alias='default'                   # An alias to use in your project
+)
+
+print("DEBUG: Connected to MongoDB in settings.py") 

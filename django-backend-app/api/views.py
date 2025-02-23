@@ -20,6 +20,10 @@ import urllib.parse
 from collections import Counter, defaultdict
 import pandas as pd
 
+from .models import Author  # Import your MongoEngine model
+
+
+
 
 extractor = KeywordExtractor()
 core_data =  pd.read_csv('data/CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
@@ -377,6 +381,21 @@ class DBLPSearchView(APIView):
                 titles = [title for title, _ in publications]
                # abstract = get_researcher_description(name=author_name, paper_titles=titles[:5])
                 abstract = 'bla bla'
+                
+                # Store in MongoDB using MongoEngine
+                author_doc = Author.objects(pid=author_pid).first()
+                if not author_doc:
+                    author_doc = Author(pid=author_pid)
+                
+                author_doc.name = author_name
+                author_doc.affiliations = affiliations
+                author_doc.dblp_url = author_url
+                author_doc.abstract = abstract
+                # If you want to store publications in DBLPSearchView, 
+                # you can parse them here similarly and append to author_doc.publications
+                
+                author_doc.save()  # Upsert operation for that PID
+                
                 # Append author data to list
                 authors_list.append({
                     "name": author_name,
