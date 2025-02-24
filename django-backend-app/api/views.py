@@ -746,3 +746,82 @@ class ResearcherProfileView(APIView):
             logger.error(f"Error parsing DBLP XML: {e}")
             return Response({"error": "Failed to parse DBLP XML."}, 
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GitHubProfileView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+    
+        name = request.GET.get("name", "").strip()
+        affiliation = request.GET.get("affiliation", "").strip()
+
+        if not name or not affiliation:
+            return Response(
+                {"error": "Both 'name' and 'affiliation' parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # --- Remove the last word from affiliation (if more than one word) ---
+        words = affiliation.split()
+        if len(words) > 1:
+            affiliation_excl_last = " ".join(words[:-1]).rstrip(",")
+        else:
+            affiliation_excl_last = affiliation.rstrip(",")
+
+        logger.info(f"Name: {name}, Affiliation minus last word: {affiliation_excl_last}")
+
+        # --- Query the GitHub Search API for the first matching user ---
+        query = name.replace(" ", "+")
+        search_api_url = f"https://api.github.com/search/users?q={query}"
+
+        try:
+            search_response = requests.get(search_api_url)
+            search_response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error calling GitHub Search API: {e}")
+            return Response({"github_url": "Error calling GitHub Search API"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        search_data = search_response.json()
+        items = search_data.get("items", [])
+
+        # --- If no user found, return early ---
+        if not items:
+            logger.warning(f"No GitHub user found for name: {name}")
+            return Response({"github_url": "No GitHub user found"}, status=status.HTTP_200_OK)
+
+        # --- Take the first user as the match ---
+        user_info = items[0]
+        user_details_api = user_info.get("url")
+        if not user_details_api:
+            logger.warning("No user details URL found in search result.")
+            return Response({"github_url": "No GitHub repository found"}, status=status.HTTP_200_OK)
+
+        # --- Fetch the user’s detailed info from GitHub ---
+        try:
+            user_details_resp = requests.get(user_details_api)
+            user_details_resp.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching user details: {e}")
+            return Response({"github_url": "Error fetching user details from GitHub"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        user_details = user_details_resp.json()
+        company = user_details.get("company", "") or ""
+        location = user_details.get("location", "") or ""
+
+        # location_first_word is the first word in the location (remove punctuation)
+        location_words = location.strip().split()
+        location_first_word = location_words[0].strip(string.punctuation) if location_words else ""
+
+        logger.debug(f"[GitHubProfileView] company={company}, location={location}")
+
+        # --- Check the matching condition ---
+        condition_location = (location_first_word and location_first_word in affiliation_excl_last)
+        condition_company = (company == affiliation_excl_last)
+
+        if condition_location or condition_company:
+            github_url = user_details.get("html_url", "No GitHub repository found")
+        else:
+            github_url = "No GitHub repository found"
+
+        return Response({"github_url": github_url}, status=status.HTTP_200_OK)

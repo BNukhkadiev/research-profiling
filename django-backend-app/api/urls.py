@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import AuthorDetailsView, SemanticScholarSearchView, PublicationSearchView, PaperDetailsView, DBLPSearchView, ResearcherProfileView
+from .views import AuthorDetailsView, SemanticScholarSearchView, PublicationSearchView, PaperDetailsView, DBLPSearchView, ResearcherProfileView, GitHubProfileView
 
 urlpatterns = [
     path('sem-scholar-search/', SemanticScholarSearchView.as_view(), name='sem-scholar-search'),
@@ -8,5 +8,6 @@ urlpatterns = [
     path('paper-details/', PaperDetailsView.as_view(), name='paper-details'),
     path('paper-details/', PaperDetailsView.as_view(), name='paper-details'),
     path('dblp-search/', DBLPSearchView.as_view(), name='dblp-search'),
-    path('researcher-profile/', ResearcherProfileView.as_view(), name='researcher-profile')
+    path('researcher-profile/', ResearcherProfileView.as_view(), name='researcher-profile'),
+    path('github-profile/', GitHubProfileView.as_view(), name='github-profile')
 ]
