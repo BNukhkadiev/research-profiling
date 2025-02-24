@@ -140,7 +140,6 @@ class PublicationSearchView(APIView):
     """
     Handles retrieval of publications for a given author using Semantic Scholar.
     """
-
     def get(self, request):
         # Get the author ID from the query parameter
         author_id = request.GET.get('author_id', '')
@@ -503,8 +502,6 @@ class ResearcherProfileView(APIView):
                 for name, count in coauthors_dict.items()],
                 key=lambda x: x["publications_together"], reverse=True
             )
-
-            
 
             return Response({
                 "name": name,

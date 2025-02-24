@@ -10,10 +10,12 @@ def get_researcher_description(name, paper_titles):
 
     prompt = (
         f"Generate a concise 2 sentence researcher description using the follownig information. "
-        f"Name: {name}"
+        f"Name: {name}, "
         f"Notable papers: {papers_str}. "
-        f"Summarize the research focus, contributions, and impact of this specific researcher."
-        f"Directly return the description without introductions, disclaimers, or extra formatting."
+        f"Summarize the research focus, contributions, and impact of this specific researcher. "
+        f"Directly return the description without introductions, disclaimers, or extra formatting. "
+        f"Put description into square brackets, for example: "
+        f"Description [[ A Researcher focusing on analysis of Knowledge Graphs. ]]"
     )
 
     payload = {
