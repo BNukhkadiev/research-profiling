@@ -1,39 +1,47 @@
-import ollama
+import requests
+
+
+
 import re
-from django.http import JsonResponse
-import json
+import requests
 
-def chat_batch(request):
-    """
-    Django API view to send a batch of 5 messages to Ollama and return only the extracted text inside square brackets.
-    """
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            messages = data.get("messages", [])
+def get_researcher_description(name, paper_titles):
+    url = "http://localhost:11434/api/generate"
 
-            # Ensure we are only sending 5 messages at a time
-            if len(messages) > 5:
-                return JsonResponse({"error": "You can send up to 5 messages per request."}, status=400)
+    papers_str = "; ".join(paper_titles) if paper_titles else "No published papers listed"
 
-            # Send batch request to Ollama
-            response = ollama.chat("gemma:2b", messages=messages)
+    prompt = (
+        f"Generate a concise two-sentence researcher description based on the following details: "
+        f"Name: {name}. "
+        f"Notable papers: {papers_str}. "
+        f"Summarize the research focus, contributions, and impact of this researcher. "
+        f"Your response must follow this exact format: [[ description_here ]]. "
+        f"DO NOT include any extra text, disclaimers, or greetings. "
+        f"Example output: [[ A researcher specializing in deep learning and graph embeddings. ]]"
+    )
 
-            # Extract response content
-            full_text = response.get("message", {}).get("content", "")
+    payload = {
+        "model": "gemma:2b",
+        "prompt": prompt,
+        "stream": False,
+        "options": {"seed": 42}
+    }
+    
+    response = requests.post(url, json=payload)
+    
+    if response.status_code == 200:
+        output_text = response.json().get("response", "")
+        
+        # Use regex to extract the content inside [[ ... ]]
+        match = re.search(r"\[\[(.*?)\]\]", output_text)
+        if match:
+            return match.group(1).strip()  # Extract text inside [[ ... ]]
+        else:
+            return f"Error: Response format incorrect - {output_text}"
+    else:
+        return f"Error: {response.text}"
 
-            # Use regex to extract text inside square brackets
-            match = re.search(r"\[(.*?)\]", full_text)
 
-            # If found, return extracted text
-            extracted_text = match.group(1) if match else "No bracketed text found."
-
-            return JsonResponse({"extracted_text": extracted_text})
-
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-
-    return JsonResponse({"error": "Invalid request method"}, status=405)
-
-
-chat_batch('hello')
+name = "Heiko Paulheim"
+paper_title = ['Data Mining', 'Neural Networks', 'Statistics']
+print(get_researcher_description(name, paper_title))
