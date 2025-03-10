@@ -844,3 +844,128 @@ class GitHubProfileView(APIView):
             logger.error(f"Failed to fetch repositories for {username}: {response.status_code}")
             return []
 
+
+class HuggingFaceProfileView(APIView):
+    permission_classes = [AllowAny]
+
+    @staticmethod
+    def get_huggingface_resources(username):
+        """
+        Fetch models and datasets associated with a Hugging Face username.
+        """
+        models_url = f"https://huggingface.co/api/models?author={username}"
+        datasets_url = f"https://huggingface.co/api/datasets?author={username}"
+
+        models_response = requests.get(models_url)
+        datasets_response = requests.get(datasets_url)
+
+        # Handle non-200 responses for models
+        if models_response.status_code != 200:
+            logger.warning(
+                f"Failed to fetch models for user {username}. "
+                f"Status code: {models_response.status_code}"
+            )
+            models = []
+        else:
+            models = models_response.json() if models_response.content else []
+
+        # Handle non-200 responses for datasets
+        if datasets_response.status_code != 200:
+            logger.warning(
+                f"Failed to fetch datasets for user {username}. "
+                f"Status code: {datasets_response.status_code}"
+            )
+            datasets = []
+        else:
+            datasets = datasets_response.json() if datasets_response.content else []
+
+        model_links = [
+            f"https://huggingface.co/{model['id']}"
+            for model in models
+            if "id" in model
+        ]
+        dataset_links = [
+            f"https://huggingface.co/datasets/{dataset['id']}"
+            for dataset in datasets
+            if "id" in dataset
+        ]
+
+        return model_links, dataset_links
+
+    @staticmethod
+    def generate_possible_usernames(first_name, last_name):
+        """
+        Generate possible Hugging Face usernames based on common patterns.
+        """
+        first_name = first_name.lower()
+        last_name = last_name.lower()
+
+        return [
+            f"{first_name}{last_name}",
+            f"{first_name}_{last_name}",
+            f"{first_name}.{last_name}",
+            f"{first_name}-{last_name}",
+            f"{first_name}{last_name[0]}",   # First name + first letter of last name
+            f"{first_name[0]}{last_name}",   # First letter of first name + last name
+            f"{first_name}{last_name[:3]}",  # First name + first 3 letters of last name
+            f"{last_name}{first_name}",      # Reverse order
+            f"{first_name[0]}{last_name[0]}" # Initials
+        ]
+
+    @staticmethod
+    def find_valid_username(first_name, last_name):
+        """
+        Check Hugging Face API for valid usernames from generated possibilities.
+        Returns the first valid username found, or None if none match.
+        """
+        possibilities = HuggingFaceProfileView.generate_possible_usernames(first_name, last_name)
+        for username in possibilities:
+            # Query the user's models to check existence
+            response = requests.get(f"https://huggingface.co/api/models?author={username}")
+            # If the request is OK and the JSON array is non-empty, we consider that username valid
+            if response.status_code == 200 and response.json():
+                return username
+        return None
+
+    def get(self, request):
+        # Grab the entire name from the query parameter
+        full_name = request.GET.get("name", "").strip()
+        if not full_name:
+            return Response(
+                {"error": "The 'name' parameter is required (e.g. 'Heiko Paulheim')."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Split name into first and last; require at least two words
+        parts = full_name.split()
+        if len(parts) < 2:
+            return Response(
+                {"error": "Please provide at least first and last name (e.g. 'Heiko Paulheim')."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        first_name, last_name = parts[0], parts[-1]
+
+        # --- Attempt to find a valid Hugging Face username ---
+        logger.info(f"Searching Hugging Face for user: {first_name} {last_name}")
+        username = self.__class__.find_valid_username(first_name, last_name)
+
+        if not username:
+            logger.warning(f"No Hugging Face user found for {full_name}")
+            return Response(
+                {"huggingface_url": "No Hugging Face profile found", "models": [], "datasets": []},
+                status=status.HTTP_200_OK
+            )
+
+        # --- If found, fetch models and datasets ---
+        model_links, dataset_links = self.__class__.get_huggingface_resources(username)
+        huggingface_profile_url = f"https://huggingface.co/{username}"
+
+        return Response(
+            {
+                "huggingface_url": huggingface_profile_url,
+                "models": model_links,
+                "datasets": dataset_links
+            },
+            status=status.HTTP_200_OK
+        )
