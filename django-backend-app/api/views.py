@@ -17,8 +17,6 @@ from .services.dblp_author_search import DblpAuthorSearchService
 
 
 
-
-
 # core_data =  pd.read_csv('data/CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
 # core_data = core_data[['name', 'abbreviation', 'rank']]
 logger = logging.getLogger(__name__)
