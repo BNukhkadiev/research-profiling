@@ -120,7 +120,7 @@ class DblpAuthorSearchService:
         )
 
         payload = {
-            "model": "gemma:2b",
+            "model": "mistral",
             "prompt": prompt,
             "stream": False,
             "options": {"seed": 42}

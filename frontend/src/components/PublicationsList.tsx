@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Typography, Button } from "@mui/material";
+import { Box, Typography, Button, Stack, Link } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 interface PublicationsListProps {
@@ -15,11 +15,21 @@ interface PublicationsListProps {
   }[];
 }
 
-const PublicationsList: React.FC<PublicationsListProps> = ({ publications }) => {
+const PublicationsList: React.FC<PublicationsListProps> = ({ publications = [] }) => {
   const navigate = useNavigate();
   const [visibleCount, setVisibleCount] = useState(5); // Show 5 publications initially
 
-  if (publications.length === 0) {
+  const handleLoadMore = () => {
+    setVisibleCount((prevCount) => prevCount + 5);
+  };
+
+  const handleViewDetails = (publicationUrl: string) => {
+    if (!publicationUrl) return; // Safe guard
+    const publicationId = publicationUrl.split("/").pop() || "";
+    navigate(`/publication/${publicationId}`);
+  };
+
+  if (!publications.length) {
     return (
       <Typography variant="body1" color="textSecondary">
         No publications available for this author.
@@ -27,85 +37,108 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ publications }) => 
     );
   }
 
-  // Increment the number of visible publications
-  const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5);
-  };
-
-  // Handle navigation to the publication details page
-  const handleViewDetails = (publicationUrl: string) => {
-    const publicationId = publicationUrl.split("/").pop() || "";
-    navigate(`/publication/${publicationId}`);
-  };
-
   return (
     <Box>
-      {publications.slice(0, visibleCount).map((publication, index) => (
-        <Box
-          key={index}
-          sx={{
-            padding: 2,
-            marginBottom: 2,
-            border: "1px solid #ddd",
-            borderRadius: 2,
-            backgroundColor: "#f9f9f9",
-          }}
-        >
-          {/* Title */}
-          <Typography variant="h6" gutterBottom>
-            {publication.title || "Untitled Publication"}
-          </Typography>
+      {publications.slice(0, visibleCount).map((pub, index) => {
+        const {
+          title = "Untitled Publication",
+          authors = [],
+          venue = "Unknown Venue",
+          year = "Unknown Year",
+          type = "Unknown Type",
+          citations,
+          topics = [],
+          links = [],
+        } = pub;
 
-          {/* Authors */}
-          <Typography variant="body2" color="textSecondary" gutterBottom>
-            {publication.authors.length > 0
-              ? publication.authors.map((author) => author.name).join(", ")
-              : "Unknown Authors"}
-          </Typography>
-
-          {/* Venue & Year */}
-          <Typography variant="body2" color="textSecondary" gutterBottom>
-            {`Venue: ${publication.venue || "Unknown Venue"} | Year: ${publication.year || "Unknown"}`}
-          </Typography>
-
-          {/* Citation Count */}
-          {publication.citations !== undefined && (
-            <Typography variant="body2" color="textSecondary" gutterBottom>
-              Citations: {publication.citations}
+        return (
+          <Box
+            key={`${title}-${index}`} // More stable key
+            sx={{
+              p: 2,
+              mb: 2,
+              border: "1px solid #ddd",
+              borderRadius: 2,
+              backgroundColor: "#fafafa",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            }}
+          >
+            {/* Title */}
+            <Typography variant="h6" gutterBottom>
+              {title}
             </Typography>
-          )}
 
-          {/* Topics */}
-          {publication.topics.length > 0 && (
+            {/* Authors */}
             <Typography variant="body2" color="textSecondary" gutterBottom>
-              Topics: {publication.topics.join(", ")}
+              <strong>Authors:</strong>{" "}
+              {authors.length > 0
+                ? authors.map((author, idx) => (
+                    <React.Fragment key={author.pid || `${author.name}-${idx}`}>
+                      {author.pid ? (
+                        <Link
+                          href={`/profile/${encodeURIComponent(author.pid)}`}
+                          style={{ textDecoration: "none" }}
+                        >
+                          {author.name}
+                        </Link>
+                      ) : (
+                        author.name
+                      )}
+                      {idx < authors.length - 1 && ", "}
+                    </React.Fragment>
+                  ))
+                : "Unknown Authors"}
             </Typography>
-          )}
 
-          {/* View Details Button */}
-          {publication.links.length > 0 && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => handleViewDetails(publication.links[0])}
-              sx={{ textTransform: "none", marginTop: 1 }}
-            >
-              View Details
-            </Button>
-          )}
-        </Box>
-      ))}
+            {/* Venue & Year */}
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              <strong>Venue:</strong> {venue} | <strong>Year:</strong> {year}
+            </Typography>
+
+            {/* Type */}
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              <strong>Type:</strong> {type}
+            </Typography>
+
+            {/* Citations */}
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              <strong>Citations:</strong> {citations !== undefined ? citations : "N/A"}
+            </Typography>
+
+            {/* Topics */}
+            {topics.length > 0 && (
+              <Typography variant="body2" color="textSecondary" gutterBottom>
+                <strong>Topics:</strong> {topics.join(", ")}
+              </Typography>
+            )}
+
+            {/* View Details Button */}
+            {links.length > 0 && links[0] && (
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => handleViewDetails(links[0])}
+                sx={{ textTransform: "none", mt: 1 }}
+              >
+                View Details
+              </Button>
+            )}
+          </Box>
+        );
+      })}
 
       {/* Load More Button */}
       {visibleCount < publications.length && (
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleLoadMore}
-          sx={{ textTransform: "none", marginTop: 2 }}
-        >
-          Load More
-        </Button>
+        <Stack alignItems="center" mt={2}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleLoadMore}
+            sx={{ textTransform: "none" }}
+          >
+            Load More
+          </Button>
+        </Stack>
       )}
     </Box>
   );

@@ -6,9 +6,9 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 
 interface PublicationCardProps {
-  title: string;
-  authors: { name: string; pid: string }[]; // Array of authors with name and PID
-  venue: string; // Venue name
+  title?: string;
+  authors?: { name: string; pid: string }[]; // Array of authors with name and PID
+  venue?: string; // Venue name
   url?: string; // Primary publication URL
   links?: string[]; // Additional links
   citationCount?: number; // Citation count (optional)
@@ -16,27 +16,31 @@ interface PublicationCardProps {
 }
 
 const PublicationCard: React.FC<PublicationCardProps> = ({
-  title,
-  authors,
-  venue,
+  title = "Untitled Publication",
+  authors = [],
+  venue = "Unknown Venue",
   url,
   links = [],
   citationCount,
-  topics,
+  topics = [],
 }) => {
   // Format authors into clickable links
-  const formattedAuthors = authors.length > 0 ? (
-    authors.map((author, index) => (
-      <React.Fragment key={author.pid}>
-        <Link href={`/profile/${encodeURIComponent(author.pid)}`} style={{ textDecoration: "none" }}>
-          {author.name}
-        </Link>
-        {index < authors.length - 1 && ", "}
-      </React.Fragment>
-    ))
-  ) : (
-    "Unknown Authors"
-  );
+  const formattedAuthors =
+    authors.length > 0 ? (
+      authors.map((author, index) => (
+        <React.Fragment key={author.pid || `${author.name}-${index}`}>
+          <Link
+            href={`/profile/${encodeURIComponent(author.pid)}`}
+            style={{ textDecoration: "none" }}
+          >
+            {author.name}
+          </Link>
+          {index < authors.length - 1 && ", "}
+        </React.Fragment>
+      ))
+    ) : (
+      "Unknown Authors"
+    );
 
   return (
     <Box
@@ -50,53 +54,58 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
     >
       {/* Title */}
       <Typography variant="h6" gutterBottom>
-        {title || "Untitled Publication"}
+        {title}
       </Typography>
 
       {/* Authors */}
       <Typography variant="body2" color="textSecondary" gutterBottom>
-        {`Authors: `} {formattedAuthors}
+        <strong>Authors:</strong> {formattedAuthors}
       </Typography>
 
       {/* Venue */}
       <Typography variant="body2" color="textSecondary" gutterBottom>
-        {`Venue: ${venue || "Unknown Venue"}`}
+        <strong>Venue:</strong> {venue}
       </Typography>
 
       {/* Citation Count */}
       {citationCount !== undefined && (
         <Typography variant="body2" color="textSecondary" gutterBottom>
-          {`Citations: ${citationCount}`}
+          <strong>Citations:</strong> {citationCount}
         </Typography>
       )}
 
       {/* Topics */}
-      {topics && topics.length > 0 && (
+      {topics.length > 0 && (
         <Typography variant="body2" color="textSecondary" gutterBottom>
-          {`Topics: ${topics.join(", ")}`}
+          <strong>Topics:</strong> {topics.join(", ")}
         </Typography>
-      )}
-
-      {/* Links */}
-      {links.length > 0 && (
-        <List dense>
-          {links.map((link, index) => (
-            <ListItem key={index} sx={{ padding: 0 }}>
-              <Link href={link} target="_blank" rel="noopener noreferrer">
-                View Publication {index + 1}
-              </Link>
-            </ListItem>
-          ))}
-        </List>
       )}
 
       {/* Primary URL */}
-      {url && links.length === 0 && (
-        <Typography variant="body2">
+      {url && (
+        <Typography variant="body2" sx={{ mt: 1 }}>
           <Link href={url} target="_blank" rel="noopener noreferrer">
-            View Publication
+            View Primary Publication
           </Link>
         </Typography>
+      )}
+
+      {/* Additional Links */}
+      {links.length > 0 && (
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="body2" color="textSecondary">
+            <strong>Additional Links:</strong>
+          </Typography>
+          <List dense>
+            {links.map((link, index) => (
+              <ListItem key={index} sx={{ padding: 0 }}>
+                <Link href={link} target="_blank" rel="noopener noreferrer">
+                  View Link {index + 1}
+                </Link>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
       )}
     </Box>
   );

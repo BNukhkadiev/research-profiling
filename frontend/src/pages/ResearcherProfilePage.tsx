@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useParams } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
@@ -10,62 +10,15 @@ import Filters from "../components/Filters";
 import StatisticsCard from "../components/StatisticsCard";
 import CoauthorsSection from "../components/CoauthorsSection";
 import ResearchersWork from "../components/ResearchersWork";
-import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery";
-
-interface VenueData {
-  name: string;
-  count: number;
-  coreRank: string;
-}
-
-interface Coauthor {
-  name: string;
-  pid: string;
-  publicationsTogether: number;
-}
+import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery"; // Updated import path
 
 const ResearcherProfilePage: React.FC = () => {
   const { pid } = useParams<{ pid: string }>();
-  const encodedPid = pid ? encodeURIComponent(pid) : "";
 
-  const [activeFilters, setActiveFilters] = useState({});
-  const [venues, setVenues] = useState<VenueData[]>([]);
-  const [coauthors, setCoauthors] = useState<Coauthor[]>([]);
-  const [topics, setTopics] = useState<{ name: string; count: number }[]>([]);
-  const [publications, setPublications] = useState([]);
-
-  const {
-    data: researcherProfile,
-    isLoading: loadingProfile,
-    isError: errorProfile,
-  } = useResearcherProfileQuery(encodedPid);
-
-  useEffect(() => {
-    if (researcherProfile?.venues) {
-      setVenues(researcherProfile.venues);
-    }
-  }, [researcherProfile]);
-
-  useEffect(() => {
-    if (researcherProfile?.coauthors) {
-      setCoauthors(researcherProfile.coauthors);
-    }
-  }, [researcherProfile]);
-
-  useEffect(() => {
-    if (researcherProfile?.topics) {
-      setTopics(researcherProfile.topics);
-    }
-  }, [researcherProfile]);
-
-  useEffect(() => {
-    if (researcherProfile?.papers) {
-      setPublications(researcherProfile.papers);
-    }
-  }, [researcherProfile]);
+  const { data: researcherProfile, isLoading, isError, error } = useResearcherProfileQuery(pid || "");
 
   const handleFilterChange = (filters: any) => {
-    setActiveFilters(filters);
+    console.log("Filters changed:", filters);
   };
 
   if (!pid) {
@@ -78,7 +31,7 @@ const ResearcherProfilePage: React.FC = () => {
     );
   }
 
-  if (loadingProfile) {
+  if (isLoading) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4">Loading data...</Typography>
@@ -86,8 +39,8 @@ const ResearcherProfilePage: React.FC = () => {
     );
   }
 
-  if (errorProfile) {
-    console.error("Error fetching researcher profile:", errorProfile);
+  if (isError) {
+    console.error("Error fetching researcher profile:", error);
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4" color="error">
@@ -97,36 +50,44 @@ const ResearcherProfilePage: React.FC = () => {
     );
   }
 
-  const statistics = {
-    papers: researcherProfile?.totalPapers ?? null,
-    citations: researcherProfile?.totalCitations ?? null,
-    hIndex: researcherProfile?.hIndex ?? null,
-    gIndex: researcherProfile?.gIndex ?? null,
-  };
+  // Destructure and provide fallback empty arrays
+  const {
+    name = "Unknown Author",
+    affiliations = [],
+    venues = [],
+    topics = [],
+    papers = [],
+    coauthors = [],
+    totalPapers = 0,
+    totalCitations = 0,
+    hIndex = 0,
+    gIndex = 0,
+  } = researcherProfile || {};
+
+  const statistics = { papers: totalPapers, citations: totalCitations, hIndex, gIndex };
 
   return (
     <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
       <Filters onFilterChange={handleFilterChange} />
       <ProfileHeader
-        author={researcherProfile?.name || "Unknown Author"}
+        author={name}
         profileUrl={`https://dblp.org/pid/${pid}`}
-        affiliations={
-          researcherProfile?.affiliations?.join(", ") || "Affiliations not available"
-        }
-        addToCompare={() =>
-          console.log(`Add to Compare Clicked for ${researcherProfile?.name}`)
-        }
+        affiliations={affiliations.length > 0 ? affiliations.join(", ") : "Affiliations not available"}
+        addToCompare={() => console.log(`Add to Compare Clicked for ${name}`)}
         isSelected={false}
       />
       <Box sx={{ display: "flex", gap: 4, marginTop: 4 }}>
+        {/* Left column */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <AwardsCard />
           <VenuesCard venues={venues} />
           <CommonTopicsCard topics={topics} />
         </Box>
+        {/* Center column */}
         <Box sx={{ width: "50%" }}>
-          <ResearchersWork author={researcherProfile?.name || ""} authorId={pid} publications={publications} />
+          <ResearchersWork author={name} authorId={pid} publications={papers} />
         </Box>
+        {/* Right column */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <StatisticsCard author={statistics} />
           <CoauthorsSection coauthors={coauthors} />
