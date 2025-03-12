@@ -8,11 +8,11 @@ import ListItemText from "@mui/material/ListItemText";
 import TopicIcon from "@mui/icons-material/Topic";
 
 export interface CommonTopicStats {
-  [topic: string]: number; // Topic name as key, count as value
+  [topic: string]: number;
 }
 
 interface CommonTopicsCardProps {
-  topics: CommonTopicStats[]; // Array of objects with topic name and count
+  topics: CommonTopicStats[];
 }
 
 const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
@@ -38,16 +38,15 @@ const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
       {topics.length > 0 ? (
         <List>
           {topics.map((topicObj, index) => {
-            const topic = Object.keys(topicObj)[0]; // Extract topic name
-            const count = topicObj[topic]; // Extract count
-
+            const topic = Object.keys(topicObj)[0];
+            const count = topicObj[topic];
             return (
               <ListItem key={index} sx={{ padding: 0 }}>
                 <ListItemIcon>
                   <TopicIcon sx={{ color: "#1976d2" }} />
                 </ListItemIcon>
                 <ListItemText
-                  primary={`${topic} (${count})`} // Display topic name and count
+                  primary={`${topic} (${count})`}
                   sx={{ color: "#555" }}
                 />
               </ListItem>

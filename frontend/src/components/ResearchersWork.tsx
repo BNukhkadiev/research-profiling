@@ -1,21 +1,24 @@
-// src/components/ResearchersWork.tsx
 import React, { useState } from "react";
 import { Tabs, Tab, Box, Typography } from "@mui/material";
 import PublicationsList from "./PublicationsList";
+
 interface Publication {
+  id: string;
   url: string;
   title: string;
   year: number;
   venue?: string;
   authors: { name: string; id?: string }[];
-  // etc.
+  citationCount?: number; // Make sure we have a place for citation count
+  topics?: string[];
+  abstract?: string;
 }
 
 interface ResearchersWorkProps {
   author: string;
   authorId: string;
-  filters: any; 
-  publications: Publication[]; // pass from parent
+  filters: any; // Replace 'any' with your FilterState type if available
+  publications: Publication[];
 }
 
 export const ResearchersWork: React.FC<ResearchersWorkProps> = ({
@@ -87,7 +90,7 @@ export const ResearchersWork: React.FC<ResearchersWorkProps> = ({
         {activeTab === "huggingface" && (
           <Box>
             <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
-            Huggingface by {author}
+              Huggingface by {author}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               This feature is under development.

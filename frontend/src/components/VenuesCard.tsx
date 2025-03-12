@@ -2,11 +2,12 @@ import React, { useState } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { Table, TableBody, TableCell, TableRow, Button } from "@mui/material";
+import { getCoreRanking } from "../utilities/coreRankings";
 
 export interface VenueData {
   name: string;
   count: number;
-  coreRank: string;
+  coreRank?: string;
 }
 
 interface VenuesCardProps {
@@ -14,11 +15,10 @@ interface VenuesCardProps {
 }
 
 const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
-  const [visibleCount, setVisibleCount] = useState(5); // Initial number of venues to display
+  const [visibleCount, setVisibleCount] = useState(5);
 
-  // Function to load more venues
   const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5); // Show 5 more venues
+    setVisibleCount((prev) => prev + 5);
   };
 
   return (
@@ -40,10 +40,7 @@ const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
       >
         Venues
       </Typography>
-      <Table
-        size="small"
-        sx={{ "& td": { border: "none", padding: "4px 8px" } }}
-      >
+      <Table size="small" sx={{ "& td, & th": { border: "none", padding: "4px 8px" } }}>
         <TableBody>
           {venues.slice(0, visibleCount).map((venue) => (
             <TableRow key={venue.name}>
@@ -53,18 +50,13 @@ const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
               <TableCell align="center" sx={{ color: "#555" }}>
                 {venue.count}
               </TableCell>
-              <TableCell
-                align="right"
-                sx={{ fontStyle: "italic", color: "#555" }}
-              >
-                {venue.coreRank || "N/A"}
+              <TableCell align="right" sx={{ fontStyle: "italic", color: "#555" }}>
+                {venue.coreRank ? venue.coreRank : getCoreRanking(venue.name) || "N/A"}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-
-      {/* Load More Button */}
       {visibleCount < venues.length && (
         <Button
           variant="contained"
