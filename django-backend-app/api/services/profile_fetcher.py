@@ -118,7 +118,6 @@ class ProfileFetcher:
 
         return publications, venue_counts, coauthors_dict, coauthor_pids, topic_counts, venues_list
 
-
     def _parse_single_publication(self, publ_info, name, coauthors_dict, coauthor_pids, topic_counts, venues_list, venue_counts):
         title = publ_info.findtext("title", "").strip()
         year = int(publ_info.findtext("year", "0") or 0)
@@ -189,8 +188,6 @@ class ProfileFetcher:
             "papers": publications,
             "coauthors": coauthors_list
         }
-
-    
 
     def _author_to_dict(self, author):
         return {
