@@ -12,9 +12,14 @@ from django.utils.decorators import method_decorator
 import xml.etree.ElementTree as ET
 ##from utils.LLM import get_researcher_description
 from utils.keybert import KeywordExtractor
-from utils.abstracts import get_abstract_from_openalex
-from utils.CORE import fuzzy_match
 import string
+from .services.profile_fetcher import ProfileFetcher
+from .services.dblp_author_search import DblpAuthorSearchService
+
+
+
+# core_data =  pd.read_csv('data/CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
+# core_data = core_data[['name', 'abbreviation', 'rank']]
 import difflib
 import urllib.parse
 from collections import Counter, defaultdict
@@ -31,111 +36,6 @@ core_data = core_data [['name', 'abbreviation', 'rank']]
             
 # Set up logging
 logger = logging.getLogger(__name__)
-@method_decorator(csrf_exempt, name='dispatch')
-class SemanticScholarSearchView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        search_query = request.GET.get('query', '')
-        logger.info(f"Received author search request with query: {search_query}")
-
-        if not search_query:
-            return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            # Query Semantic Scholar
-            semantic_scholar_url = (
-                f"https://api.semanticscholar.org/graph/v1/author/search?"
-                f"query={search_query}&fields=name,url,affiliations,paperCount,hIndex,citationCount,"
-                f"externalIds,papers.title,papers.year"
-            )
-            logger.info(f"Querying Semantic Scholar API: {semantic_scholar_url}")
-            semantic_scholar_response = requests.get(semantic_scholar_url)
-            semantic_scholar_response.raise_for_status()
-            semantic_scholar_data = semantic_scholar_response.json()
-
-            # Query DBLP
-            dblp_url = f"https://dblp.org/search/author/api?q={search_query}&format=json"
-            logger.info(f"Querying DBLP API: {dblp_url}")
-            dblp_response = requests.get(dblp_url)
-            dblp_response.raise_for_status()
-            dblp_data = dblp_response.json()
-
-            if not semantic_scholar_data.get("data") or not dblp_data.get("result", {}).get("hits", {}).get("hit"):
-                logger.warning("No authors found in Semantic Scholar or DBLP.")
-                return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
-
-            # Process authors
-            dblp_authors = dblp_data["result"]["hits"]["hit"]
-            processed_authors = []
-            for scholar_author in semantic_scholar_data["data"]:
-                scholar_paper_titles = {
-                    paper["title"].strip().rstrip(".") for paper in scholar_author.get("papers", []) if "title" in paper
-                }
-
-                best_match = None
-                max_intersection_size = 0
-
-                for dblp_author in dblp_authors:
-                    author_name = dblp_author["info"]["author"]
-                    author_url = dblp_author["info"].get("url")
-                    dblp_affiliations = []
-                    dblp_paper_titles = []
-
-                    if not author_url:
-                        logger.debug(f"No URL found for DBLP author: {author_name}")
-                        continue
-
-                    try:
-                        # Fetch DBLP XML
-                        logger.info(f"Fetching DBLP XML for author: {author_name} from {author_url}")
-                        author_profile_response = requests.get(f"{author_url}.xml")
-                        author_profile_response.raise_for_status()
-                        root = ET.fromstring(author_profile_response.text)
-
-                        # Extract DBLP paper titles
-                        dblp_paper_titles = [title.text.rstrip(".") for title in root.findall(".//title")]
-                        logger.debug(f"Extracted DBLP titles for {author_name}: {dblp_paper_titles}")
-                        # print(f"Extracted DBLP titles for {author_name}: {dblp_paper_titles}")
-
-                        # Extract affiliations from DBLP notes
-                        if "notes" in dblp_author["info"]:
-                            notes = dblp_author["info"]["notes"].get("note", [])
-                            if isinstance(notes, dict):  # Single note case
-                                notes = [notes]
-                            dblp_affiliations = [
-                                note["text"] for note in notes if note.get("@type") == "affiliation"
-                            ]
-                            logger.debug(f"Extracted affiliations for {author_name}: {dblp_affiliations}")
-                            # print(f"Extracted affiliations for {author_name}: {dblp_affiliations}")
-                        # Determine the intersection size
-                        intersection_size = len(scholar_paper_titles.intersection(dblp_paper_titles))
-                        logger.debug(f"Intersection size for {author_name}: {intersection_size}")
-                        print(f"Intersection size for {author_name}: {intersection_size}")
-
-                        if intersection_size > max_intersection_size and intersection_size>3:
-                            max_intersection_size = intersection_size
-                            best_match = {"affiliations": dblp_affiliations}
-
-                    except requests.exceptions.RequestException as e:
-                        logger.error(f"Error fetching DBLP XML for author {author_name}: {e}")
-                    except ET.ParseError as e:
-                        logger.error(f"Error parsing DBLP XML for author {author_name}: {e}")
-
-                # Add the best match's affiliations
-                if best_match:
-                    scholar_author["affiliations"].extend(best_match["affiliations"])
-                else:
-                    logger.warning(f"No match found for Semantic Scholar author: {scholar_author['name']}")
-
-                processed_authors.append(scholar_author)
-
-            logger.info("Processed authors with enriched affiliations.")
-            return Response({"data": processed_authors}, status=status.HTTP_200_OK)
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error querying APIs: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 #########
@@ -197,54 +97,6 @@ class PublicationSearchView(APIView):
 
 
 
-class AuthorDetailsView(APIView):
-    permission_classes = [AllowAny]
-    """
-    Handles fetching author details from Semantic Scholar and processes the affiliation.
-    """
-
-    def get(self, request):
-        # Get the author ID and affiliation from the query parameters
-        author_id = request.GET.get("author_id", "")
-        affiliation = request.GET.get("affiliation", "")
-        logger.info(
-            f"Received request to fetch details for author ID: {author_id} with affiliation: {affiliation}"
-        )
-
-        if not author_id:
-            return Response(
-                {"error": "Author ID is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Query the Semantic Scholar API for the author's details
-        semantic_scholar_url = (
-            f"https://api.semanticscholar.org/graph/v1/author/{author_id}?"
-            f"fields=name,url,affiliations,paperCount,hIndex,citationCount"
-        )
-        logger.info(f"Querying Semantic Scholar API: {semantic_scholar_url}")
-
-        try:
-            semantic_scholar_response = requests.get(semantic_scholar_url)
-            semantic_scholar_response.raise_for_status()
-            author_data = semantic_scholar_response.json()
-
-            # Attach the provided affiliation if not already present
-            if affiliation and affiliation not in author_data.get("affiliations", []):
-                author_data.setdefault("affiliations", []).append(affiliation)
-
-            # Return the enriched author data
-            logger.info(f"Author data fetched and processed successfully: {author_data}")
-            return Response(author_data, status=status.HTTP_200_OK)
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error querying Semantic Scholar API: {e}")
-            return Response(
-                {"error": "Failed to fetch author details."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
 class PaperDetailsView(APIView):
     permission_classes = [AllowAny]
     """
@@ -294,272 +146,137 @@ class PaperDetailsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ResearcherThumbnailView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        search_query = request.GET.get('query', '')
-        logger.info(f"Received author search request with query: {search_query}")
-
-        if not search_query:
-            return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try: 
-            dblp_url = f"https://dblp.org/search/author/api?q={search_query}&format=json"
-            logger.info(f"Querying DBLP API: {dblp_url}")
-            dblp_response = requests.get(dblp_url)
-            dblp_response.raise_for_status()
-            dblp_data = dblp_response.json()
-
-            # Return the transformed response
-            logger.info(f"Successfully fetched and formatted {len(formatted_publications)} publications.")
-            return Response({"publications": formatted_publications}, status=status.HTTP_200_OK)
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching DBLP XML for author {search_query}: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 class DBLPSearchView(APIView):
     permission_classes = [AllowAny]
+
     def get(self, request):
         search_query = request.GET.get('query', '').strip()
-        logger.info(f"Received author search request with query: {search_query}")
-
         if not search_query:
             return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            # Query DBLP API for author search
-            dblp_url = f"https://dblp.org/search/author/api?q={urllib.parse.quote(search_query)}&format=json"
-            logger.info(f"Querying DBLP API: {dblp_url}")
-            dblp_response = requests.get(dblp_url)
-            dblp_response.raise_for_status()
-            dblp_data = dblp_response.json()
+        search_service = DblpAuthorSearchService(search_query)
+        authors = search_service.search_authors()
 
-            # Check if any authors were found
-            if not dblp_data.get("result", {}).get("hits", {}).get("hit"):
-                logger.warning("No authors found in DBLP.")
-                return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
+        if not authors:
+            return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
 
-            authors_list = []
-            dblp_authors = dblp_data["result"]["hits"]["hit"]
-
-            # Process each matched author
-            for dblp_author in dblp_authors:
-                author_info = dblp_author.get("info", {})
-                author_name = author_info.get("author")
-                author_url = author_info.get("url")
-
-                if not author_url:
-                    continue  # Skip authors with missing DBLP profile links
-
-                # Extract PID correctly (after "pid/")
-                author_pid = author_url.split("/pid/")[-1]  # Extract PID part
-
-                # Fetch detailed DBLP XML using author PID
-                author_pid_url = f"{author_url}.xml"
-                logger.info(f"Fetching DBLP XML from {author_pid_url}")
-                author_profile_response = requests.get(author_pid_url)
-                author_profile_response.raise_for_status()
-                root = ET.fromstring(author_profile_response.text)
-
-                # Extract affiliations
-                affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
-
-                # Extract publications
-                publications = []
-                for pub in root.findall(".//r"):
-                    publ_info = pub.find("./*")  # Finds first child element (e.g., article or inproceedings)
-                    if publ_info is not None:
-                        title = publ_info.findtext("title", "").strip()
-                        venue = publ_info.findtext("booktitle") or publ_info.findtext("journal", "Unknown Venue")
-                        if title:
-                            publications.append((title, venue))
-
-                # Generate LLM-based abstract
-                titles = [title for title, _ in publications]
-               # abstract = get_researcher_description(name=author_name, paper_titles=titles[:5])
-                abstract = 'bla bla'
-                
-                # Store in MongoDB using MongoEngine
-                author_doc = Author.objects(pid=author_pid).first()
-                if not author_doc:
-                    author_doc = Author(pid=author_pid)
-                
-                author_doc.name = author_name
-                author_doc.affiliations = affiliations
-                author_doc.dblp_url = author_url
-                author_doc.abstract = abstract
-                # If you want to store publications in DBLPSearchView, 
-                # you can parse them here similarly and append to author_doc.publications
-                
-                author_doc.save()  # Upsert operation for that PID
-                
-                # Append author data to list
-                authors_list.append({
-                    "name": author_name,
-                    "pid": author_pid,  # Now correctly extracted
-                    "affiliations": affiliations,
-                    "dblp_url": author_url,
-                    "abstract": abstract
-                })
-
-            return Response({"authors": authors_list}, status=status.HTTP_200_OK)
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error querying DBLP API: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        except ET.ParseError as e:
-            logger.error(f"Error parsing DBLP XML: {e}")
-            return Response({"error": "Failed to parse DBLP XML."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"authors": authors}, status=status.HTTP_200_OK)
 
 '''
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
-    
+
+    # Instantiate keyword extractor once for efficiency
+    extractor = KeywordExtractor()
+
     def get(self, request):
         pid = request.GET.get('pid', '').strip()
-        pid = urllib.parse.unquote(pid)
-        logger.info(f"Received author details request with pid: {pid}")
 
         if not pid:
+            logger.warning("No PID provided in request")
             return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        logger.info(f"Fetching profile for PID: {pid}")
+
         try:
-            dblp_url = f'https://dblp.org/pid/{pid}.xml'
-            logger.info(f"Querying DBLP API: {dblp_url}")
-            dblp_response = requests.get(dblp_url)
-            dblp_response.raise_for_status()
+            fetcher = ProfileFetcher(pid, self.extractor)
+            profile_data = fetcher.fetch_profile()
 
-            if not dblp_response.text.strip():
-                logger.error(f"DBLP returned an empty response for PID: {pid}")
-                return Response({"error": "DBLP returned an empty response. PID may not exist."},
-                                status=status.HTTP_404_NOT_FOUND)
-
-            root = ET.fromstring(dblp_response.text)
-
-            name = root.get("name", "Unknown Researcher")
-            affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
-
-            publications = []
-
-
-            # Fetch or create the Author doc
-            author_doc = Author.objects(pid=pid).first()
-            if not author_doc:
-                author_doc = Author(pid=pid)
-            author_doc.name = name
-            author_doc.affiliations = affiliations
-
-
-            venue_counts = {}  # Count occurrences of each venue
-            coauthors_dict = defaultdict(int)  # Store coauthor names with count of coauthored papers
-            coauthor_pids = {}  # Store PID of coauthors
-            topic_counts = Counter()
-            venues_list = []
-
-
-
-            pub_list = []
-            for pub in root.findall(".//r"):
-                publ_info = pub.find("./*")
-                if publ_info is not None:
-                    title = publ_info.findtext("title", "").strip()
-                    year = int(publ_info.findtext("year", "0") or 0)
-
-                    # Determine publication type
-                    if publ_info.tag == "inproceedings":
-                        paper_type = "Conference Paper"
-                        venue = publ_info.findtext("booktitle", "Unknown Conference")
-                    elif publ_info.tag == "article":
-                        paper_type = "Journal Article"
-                        venue = publ_info.findtext("journal", "Unknown Journal")
-                    elif publ_info.tag == "phdthesis":
-                        paper_type = "PhD Thesis"
-                        venue = "PhD Dissertation"
-                    elif publ_info.tag == "mastersthesis":
-                        paper_type = "Masters Thesis"
-                        venue = "Masters Dissertation"
-                    else:
-                        paper_type = "Other"
-
-                    # Count venue occurrences
-                    venues_list.append(venue)
-                    venue_counts[venue] = venue_counts.get(venue, 0) + 1
-
-                    # Extract authors
-                    paper_authors = []
-                    for author in publ_info.findall("author"):
-                        author_name = author.text
-                        author_pid = author.get("pid", "")
-                        paper_authors.append({"name": author_name, "pid": author_pid})
-
-                        # Track coauthor count, excluding the main researcher
-                        if author_name != name:
-                            coauthors_dict[author_name] += 1
-                            coauthor_pids[author_name] = author_pid
-
-                    # Extract links
-                    links = [ee.text for ee in publ_info.findall("ee")]
-
-                    # Extract topics using KeywordExtractor
-                    abstract = "Some abstract here bla bla bla bla "
-                  #  raw_topics = extractor.extract_keywords(doc=abstract)
-                  #  topics = [topic[0] for topic in raw_topics]
-                    topics = " bla bla"
-
-                    topic_counts.update(topics)
-
-                    # Assign the list of embedded publications to the Author
-                    author_doc.publications = pub_list
-
-                    # Save or update author
-                    author_doc.save()
-
-                    # Build the embedded Publication object
-                    publication = Publication(
-                        title=title,
-                        year=year,
-                        paper_type=paper_type,
-                        venue=venue,
-                        citations=0,
-                        topics=[],
-                        links=links
-                    )
-                    pub_list.append(publication)
-
-            venue_ranks = {venue: fuzzy_match(core_data, venue, 'name', 'abbreviation') for venue in venues_list}
-
-            # Convert venue counts to required format
-            venue_list = [{venue: {"count": count, "core_rank": venue_ranks.get(venue, "Unknown")}} 
-                          for venue, count in sorted(venue_counts.items(), key=lambda x: x[1], reverse=True)]
-            topics_list = [{topic: count} for topic, count in topic_counts.most_common()]
-
-            # Convert coauthors dictionary to list with coauthored publication count
-            coauthors_list = sorted(
-                [{"name": name, "pid": coauthor_pids.get(name, ""), "publications_together": count}
-                for name, count in coauthors_dict.items()],
-                key=lambda x: x["publications_together"], reverse=True
-            )
-
-            
-
-            return Response({
-                "name": name,
-                "affiliations": affiliations,
-                "h-index": 3,  # Placeholder
-                "g-index": 2,  # Placeholder
-                "total_papers": len(publications),
-                "total_citations": 1000,  # Placeholder
-                "venues": venue_list,
-                "topics": topics_list,
-                "papers": publications,
-                "coauthors": coauthors_list,
-            }, status=status.HTTP_200_OK)
+            return Response(profile_data, status=status.HTTP_200_OK)
 
         except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching data from DBLP for PID {pid}: {e}")
+            return Response({"error": "Failed to fetch data from DBLP."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        except ValueError as e:
+            logger.error(f"Invalid PID or no data found for PID {pid}: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            logger.exception(f"Unexpected error occurred for PID {pid}: {e}")
+            return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class GitHubProfileView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+    
+        name = request.GET.get("name", "").strip()
+        affiliation = request.GET.get("affiliation", "").strip()
+
+        if not name or not affiliation:
+            return Response(
+                {"error": "Both 'name' and 'affiliation' parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # --- Remove the last word from affiliation (if more than one word) ---
+        words = affiliation.split()
+        if len(words) > 1:
+            affiliation_excl_last = " ".join(words[:-1]).rstrip(",")
+        else:
+            affiliation_excl_last = affiliation.rstrip(",")
+
+        logger.info(f"Name: {name}, Affiliation minus last word: {affiliation_excl_last}")
+
+        # --- Query the GitHub Search API for the first matching user ---
+        query = name.replace(" ", "+")
+        search_api_url = f"https://api.github.com/search/users?q={query}"
+
+        try:
+            search_response = requests.get(search_api_url)
+            search_response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error calling GitHub Search API: {e}")
+            return Response({"github_url": "Error calling GitHub Search API"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        search_data = search_response.json()
+        items = search_data.get("items", [])
+
+        # --- If no user found, return early ---
+        if not items:
+            logger.warning(f"No GitHub user found for name: {name}")
+            return Response({"github_url": "No GitHub user found"}, status=status.HTTP_200_OK)
+
+        # --- Take the first user as the match ---
+        user_info = items[0]
+        user_details_api = user_info.get("url")
+        if not user_details_api:
+            logger.warning("No user details URL found in search result.")
+            return Response({"github_url": "No GitHub repository found"}, status=status.HTTP_200_OK)
+
+        # --- Fetch the user’s detailed info from GitHub ---
+        try:
+            user_details_resp = requests.get(user_details_api)
+            user_details_resp.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching user details: {e}")
+            return Response({"github_url": "Error fetching user details from GitHub"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        user_details = user_details_resp.json()
+        company = user_details.get("company", "") or ""
+        location = user_details.get("location", "") or ""
+
+        # location_first_word is the first word in the location (remove punctuation)
+        location_words = location.strip().split()
+        location_first_word = location_words[0].strip(string.punctuation) if location_words else ""
+
+        logger.debug(f"[GitHubProfileView] company={company}, location={location}")
+
+        # --- Check the matching condition ---
+        condition_location = (location_first_word and location_first_word in affiliation_excl_last)
+        condition_company = (company == affiliation_excl_last)
+
+        if condition_location or condition_company:
+            github_url = user_details.get("html_url", "No GitHub repository found")
+        else:
+            github_url = "No GitHub repository found"
+
+        return Response({"github_url": github_url}, status=status.HTTP_200_OK)
+    
+
+
+
             logger.error(f"Error querying DBLP API: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
         '''
