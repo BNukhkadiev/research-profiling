@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import unquote
 import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -260,3 +261,97 @@ class GitHubProfileView(APIView):
     
 
 
+
+#write compare researchers view here
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from api.models import Author  # Ensure this matches your models import path
+from api.services.profile_fetcher import ProfileFetcher
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ✅ In-memory comparison list
+comparison_list = set()
+
+class CompareResearchersView(APIView):
+    permission_classes = [AllowAny]
+    """
+    Manages the list of researchers in comparison.
+    """
+
+    def get(self, request):
+        """
+        Get the list of researchers currently in the comparison list.
+        """
+        return Response({"comparison_list": list(comparison_list)}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """
+        Add a researcher to the comparison list.
+        If the researcher is not found in MongoDB, fetch it from DBLP and store it.
+        """
+        pid = request.data.get("pid", "").strip()
+        if not pid:
+            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # If already in the list, return success
+        if pid in comparison_list:
+            return Response({"message": "Researcher already in comparison list."}, status=status.HTTP_200_OK)
+
+        # Check if researcher exists in MongoDB
+        author = Author.objects(pid=pid).first()
+        if not author:
+            try:
+                logger.info(f"Fetching new researcher data for {pid}")
+                fetcher = ProfileFetcher(pid)
+                profile_data = fetcher.fetch_profile()
+
+                # ✅ Store new author in MongoDB
+                new_author = Author(
+                    pid=profile_data["pid"],
+                    name=profile_data["name"],
+                    affiliations=profile_data["affiliations"],
+                    dblp_url=profile_data.get("dblp_url", ""),
+                    abstract=profile_data.get("abstract", ""),
+                    publications=[
+                        {
+                            "title": pub["title"],
+                            "year": pub["year"],
+                            "paper_type": pub["type"],
+                            "venue": pub["venue"],
+                            "citations": pub["citations"],
+                            "topics": pub["topics"],
+                            "links": pub["links"],
+                            "coauthors": [a["name"] for a in pub["authors"] if a["name"] != profile_data["name"]]
+                        } for pub in profile_data.get("papers", [])
+                    ]
+                )
+                new_author.save()
+
+                # ✅ Add to comparison list
+                comparison_list.add(pid)
+
+                return Response({"message": "Researcher added to comparison list.", "profile": profile_data}, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                logger.error(f"Failed to fetch researcher {pid}: {e}")
+                return Response({"error": "Failed to fetch researcher data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # ✅ Add researcher to comparison list if already exists in MongoDB
+        comparison_list.add(pid)
+        return Response({"message": "Researcher added to comparison list."}, status=status.HTTP_200_OK)
+
+    def delete(self, request):
+        """
+        Remove a researcher from the comparison list.
+        """
+        pid = request.data.get("pid", "").strip()
+        if not pid:
+            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if pid in comparison_list:
+            comparison_list.remove(pid)
+            return Response({"message": f"Removed researcher {pid} from comparison list."}, status=status.HTTP_200_OK)
+
+        return Response({"error": "Researcher not found in comparison list."}, status=status.HTTP_404_NOT_FOUND)

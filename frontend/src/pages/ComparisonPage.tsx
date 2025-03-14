@@ -1,151 +1,99 @@
-import React, { useState } from "react";
+import React from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import IconButton from "@mui/material/IconButton";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { useResearcherProfileQuery } from "../react-query/useResearcherProfileQuery";
 import {
-  Box,
-  Typography,
-  Grid,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  TextField,
-  DialogActions,
-  Button,
-  IconButton,
-} from "@mui/material";
-import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import UserCard from "../components/UserCard";
-import PublicationsPerYearChart from "../components/PublicationsPerYearChart";
-import CoreRankingChart from "../components/CoreRankingChart";
+  useComparisonResearchers,
+  useCompareResearcher,
+} from "../react-query/useComparisonQuery";
 
 const ComparisonPage: React.FC = () => {
-  const [researchers, setResearchers] = useState([
-    { name: "Rainer Gemulla", institution: "University of Mannheim" },
-    { name: "Daniel Ruffinelli", institution: "University of Stuttgart" },
-    { name: "Alexander Renz-Wieland", institution: "ETH Zurich" },
-  ]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  const [open, setOpen] = useState(false); // State to manage dialog visibility
-  const [newResearcherName, setNewResearcherName] = useState(""); // State to hold new researcher name
+  const selectedPids = searchParams.get("authors")?.split(",") || [];
+  const { data: selectedResearchers = [] } = useComparisonResearchers() ?? {
+    data: [],
+  };
+  const compareResearcherMutation = useCompareResearcher();
 
-  // Handle opening the dialog
-  const handleOpenDialog = () => {
-    setOpen(true);
+  const handleRemoveFromComparison = (pid: string) => {
+    compareResearcherMutation.mutate({ pid, action: "remove" });
+    const updatedPids = selectedPids.filter((id) => id !== pid);
+    setSearchParams({ authors: updatedPids.join(",") });
   };
 
-  // Handle closing the dialog
-  const handleCloseDialog = () => {
-    setOpen(false);
-    setNewResearcherName(""); // Clear input
-  };
-
-  // Handle adding a new researcher
-  const handleAddResearcher = () => {
-    if (newResearcherName.trim()) {
-      setResearchers((prev) => [
-        ...prev,
-        { name: newResearcherName, institution: "Unknown Institution" },
-      ]);
-    }
-    handleCloseDialog();
+  const handleClearAll = () => {
+    selectedPids.forEach((pid) =>
+      compareResearcherMutation.mutate({ pid, action: "remove" })
+    );
+    setSearchParams({ authors: "" });
   };
 
   return (
-    <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
-      {/* Title */}
-      <Typography variant="h4" sx={{ marginBottom: 4, fontWeight: "bold" }}>
-        Compare Researchers
+    <Box sx={{ padding: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Researcher Comparison
       </Typography>
 
-      {/* User Cards */}
-      <Grid container spacing={2} sx={{ marginBottom: 2 }}>
-        {researchers.map((researcher, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
-            <UserCard
-              name={researcher.name}
-              institution={researcher.institution}
-            />
-          </Grid>
-        ))}
-      </Grid>
+      {selectedPids.length === 0 ? (
+        <Typography>No researchers selected for comparison.</Typography>
+      ) : (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {selectedPids.map((pid) => {
+            const { data: researcher, isLoading } =
+              useResearcherProfileQuery(pid);
 
-      {/* Add New Researcher Button */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          marginBottom: 4,
-        }}
-      >
-        <IconButton
-          color="primary"
-          onClick={handleOpenDialog}
-          sx={{ display: "flex", flexDirection: "column" }}
+            if (isLoading)
+              return (
+                <Typography key={pid}>Loading researcher data...</Typography>
+              );
+            if (!researcher) return null;
+
+            return (
+              <Card
+                key={researcher.pid}
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 2,
+                }}
+              >
+                <CardContent>
+                  <Typography variant="h6">{researcher.name}</Typography>
+                  <Typography variant="body2">
+                    Affiliations: {researcher.affiliations.join(", ") || "N/A"}
+                  </Typography>
+                </CardContent>
+                <IconButton
+                  onClick={() => handleRemoveFromComparison(researcher.pid)}
+                  color="error"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Card>
+            );
+          })}
+        </Box>
+      )}
+
+      {selectedPids.length > 0 && (
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={handleClearAll}
+          sx={{ marginTop: 3 }}
         >
-          <AddCircleOutlineIcon fontSize="large" />
-          <Typography variant="body2" color="primary">
-            Add Researcher
-          </Typography>
-        </IconButton>
-      </Box>
-
-      {/* Charts Section */}
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={6}>
-          <Box
-            sx={{
-              backgroundColor: "white",
-              padding: 2,
-              borderRadius: 2,
-              boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.1)",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ marginBottom: 2, fontWeight: "bold" }}
-            >
-              Number of Publications Per Year
-            </Typography>
-            <PublicationsPerYearChart />
-          </Box>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Box
-            sx={{
-              backgroundColor: "white",
-              padding: 2,
-              borderRadius: 2,
-              boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.1)",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ marginBottom: 2, fontWeight: "bold" }}
-            >
-              Number of CORE Ranking Publications
-            </Typography>
-            <CoreRankingChart />
-          </Box>
-        </Grid>
-      </Grid>
-
-      {/* Dialog for Searching New Researcher */}
-      <Dialog open={open} onClose={handleCloseDialog}>
-        <DialogTitle>Search for New Author</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Researcher Name"
-            fullWidth
-            value={newResearcherName}
-            onChange={(e) => setNewResearcherName(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleAddResearcher} variant="contained">
-            Add Researcher
-          </Button>
-        </DialogActions>
-      </Dialog>
+          Clear All
+        </Button>
+      )}
     </Box>
   );
 };

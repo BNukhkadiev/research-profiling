@@ -1,93 +1,145 @@
 import React from "react";
-import { Box, Typography, Grid, Button } from "@mui/material";
-import ResearcherCard from "../components/ResearcherCard";
-import LineChart from "../components/LineChart";
-import { BarChart, PieChart } from "recharts";
+import {
+  Box,
+  Typography,
+  Grid,
+  Button,
+  CircularProgress,
+  IconButton,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close"; // ✅ Import Close (X) icon
+import {
+  useComparisonResearchers,
+  useRemoveResearcher,
+} from "../react-query/useComparisonQuery";
+import PublicationsLineChart from "../components/PublicationsLineChart";
+import CoreRankingBarChart from "../components/CoreRankingBarChart";
+import ResearchAreasPieChart from "../components/ResearchAreasPieChart";
 
-const CompareResearchersPage: React.FC = () => {
+const CompareResearchersPage = () => {
+  const { researchers, isLoading } = useComparisonResearchers();
+  const removeResearcherMutation = useRemoveResearcher();
+
+  console.log(" Researchers List:", researchers); //  Debugging researchers list
+
+  if (isLoading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "50vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!researchers || researchers.length === 0) {
+    return <Typography>No researchers selected for comparison.</Typography>;
+  }
+
   return (
     <Box sx={{ padding: 4 }}>
-      {/* Header Section */}
-      <Typography variant="h5" sx={{ marginBottom: 4 }}>
+      <Typography variant="h4" sx={{ marginBottom: 4 }}>
         Compare Researchers
       </Typography>
-      <Grid container spacing={2} sx={{ marginBottom: 4 }}>
-        {[1, 2, 3].map((_, index) => (
-          <Grid item xs={4} key={index}>
-            <ResearcherCard
-              name={`Researcher ${index + 1}`}
-              profileUrl=""
-              affiliations={`Affiliation ${index + 1}`}
-            />
+
+      {/* Researcher Info Cards */}
+      <Grid container spacing={2}>
+        {researchers.map(({ pid, data, isLoading, isError }) => (
+          <Grid item xs={12} sm={6} md={4} key={pid}>
+            <Box
+              sx={{
+                position: "relative", // ✅ Enable absolute positioning for the X button
+                padding: 2,
+                backgroundColor: "#fff",
+                borderRadius: 2,
+                boxShadow: 2,
+              }}
+            >
+              {/* Small "X" button on top-right */}
+              <IconButton
+                onClick={() => removeResearcherMutation.mutate(pid)}
+                sx={{
+                  position: "absolute",
+                  top: 4,
+                  right: 4,
+                  color: "gray",
+                  "&:hover": { color: "black" }, // Make it darker on hover
+                }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+              {isLoading ? (
+                <CircularProgress />
+              ) : isError || !data ? (
+                <Typography color="error">
+                  Failed to load researcher {pid}
+                </Typography>
+              ) : (
+                <>
+                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                    {data.name}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="textSecondary"
+                    sx={{ mb: 1 }}
+                  >
+                    {data.affiliations?.join(", ") || "No affiliations"}
+                  </Typography>
+                  <Typography variant="body1">
+                    <strong>H-Index:</strong> {data.hIndex ?? "N/A"}
+                  </Typography>
+                  <Typography variant="body1">
+                    <strong>Total Papers:</strong> {data.totalPapers ?? "N/A"}
+                  </Typography>
+                  <Typography variant="body1">
+                    <strong>Total Citations:</strong>{" "}
+                    {data.totalCitations ?? "N/A"}
+                  </Typography>
+                </>
+              )}
+            </Box>
           </Grid>
         ))}
       </Grid>
 
-      {/* Charts Section */}
-      <Grid container spacing={4}>
-        {/* Number of Publications */}
-        <Grid item xs={6}>
-          <Box
-            sx={{
-              padding: 2,
-              backgroundColor: "white",
-              borderRadius: 2,
-              boxShadow: "0px 2px 6px rgba(0,0,0,0.1)",
-            }}
-          >
-            <Typography variant="h6" sx={{ marginBottom: 2 }}>
-              Number of publications per year
-            </Typography>
-            <LineChart />
-            <Button variant="outlined" sx={{ marginTop: 2 }}>
-              Download Report
-            </Button>
-          </Box>
-        </Grid>
-
-        {/* CORE Ranking */}
-        <Grid item xs={6}>
-          <Box
-            sx={{
-              padding: 2,
-              backgroundColor: "white",
-              borderRadius: 2,
-              boxShadow: "0px 2px 6px rgba(0,0,0,0.1)",
-            }}
-          >
-            <Typography variant="h6" sx={{ marginBottom: 2 }}>
-              Number of CORE ranking publications
-            </Typography>
-            <BarChart />
-            <Button variant="outlined" sx={{ marginTop: 2 }}>
-              Download Report
-            </Button>
-          </Box>
-        </Grid>
-
-        {/* Researcher Areas */}
-        <Grid item xs={12}>
-          <Box
-            sx={{
-              padding: 2,
-              backgroundColor: "white",
-              borderRadius: 2,
-              boxShadow: "0px 2px 6px rgba(0,0,0,0.1)",
-            }}
-          >
-            <Typography variant="h6" sx={{ marginBottom: 2 }}>
-              Researcher Areas
-            </Typography>
-            <Grid container spacing={2}>
-              {[1, 2, 3].map((_, index) => (
-                <Grid item xs={4} key={index}>
-                  <PieChart />
-                </Grid>
-              ))}
+      {/* Charts for comparison */}
+      {researchers.length > 0 && (
+        <>
+          <Grid container spacing={2} sx={{ marginTop: 4 }}>
+            <Grid item xs={12} md={6}>
+              <PublicationsLineChart
+                researchers={researchers.map(({ data }) => ({
+                  name: data?.name || "Unknown",
+                  papers: data?.papers || [],
+                }))}
+              />
             </Grid>
+            <Grid item xs={12} md={6}>
+              <CoreRankingBarChart
+                researchers={researchers.map(({ data }) => ({
+                  name: data?.name || "Unknown",
+                  papers: data?.papers || [], // Send `papers` instead of `venues`
+                }))}
+              />
+            </Grid>
+          </Grid>
+
+          <Box sx={{ marginTop: 4 }}>
+            <ResearchAreasPieChart
+              researchers={researchers.map(({ data }) => ({
+                name: data?.name || "Unknown",
+                papers: data?.papers || [], // ✅ Ensure `papers` is always an array
+              }))}
+            />
           </Box>
-        </Grid>
-      </Grid>
+        </>
+      )}
     </Box>
   );
 };

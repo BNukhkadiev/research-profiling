@@ -50,7 +50,11 @@ const SearchCard: React.FC<SearchCardProps> = ({
       </Typography>
 
       <Tooltip
-        title={affiliations.length > 0 ? affiliations.join(", ") : "No affiliations available"}
+        title={
+          affiliations.length > 0
+            ? affiliations.join(", ")
+            : "No affiliations available"
+        }
         placement="bottom-start"
         arrow
       >
@@ -65,7 +69,9 @@ const SearchCard: React.FC<SearchCardProps> = ({
             textOverflow: "ellipsis",
           }}
         >
-          {affiliations.length > 0 ? affiliations.join(", ") : "No affiliations available"}
+          {affiliations.length > 0
+            ? affiliations.join(", ")
+            : "No affiliations available"}
         </Typography>
       </Tooltip>
 

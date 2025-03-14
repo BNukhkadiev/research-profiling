@@ -15,9 +15,18 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchResultsPage />} />
-        <Route path="/profile/:pid" element={<ResearcherProfilePage />} /> {/* Updated Route */}
-        <Route path="/compare-researchers" element={<CompareResearchersPage />} />
-        <Route path="/publication/:publicationId" element={<PublicationDetailsPage />} />
+        <Route path="/profile/:pid" element={<ResearcherProfilePage />} />{" "}
+        {/* Updated Route */}
+        {/* Updated Route */}
+        <Route
+          path="/compare-researchers"
+          element={<CompareResearchersPage />}
+        />{" "}
+        {/* Updated route */}
+        <Route
+          path="/publication/:publicationId"
+          element={<PublicationDetailsPage />}
+        />
       </Routes>
     </Router>
   );

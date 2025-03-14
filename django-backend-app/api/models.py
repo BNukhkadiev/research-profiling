@@ -1,45 +1,50 @@
-from django.contrib.auth.models import AbstractUser
 from django.db import models
-
-# mongo_models/models.py
 from mongoengine import (
     Document, StringField, ListField, DateTimeField,
-    ReferenceField, EmbeddedDocument, EmbeddedDocumentField,
-    EmbeddedDocumentListField, IntField, URLField
+    EmbeddedDocument, EmbeddedDocumentListField, IntField, URLField
 )
-
 import datetime
 
+
 class Publication(EmbeddedDocument):
+    """
+    Embedded document representing a research publication.
+    """
     title = StringField(required=True)
     year = IntField(default=0)
     paper_type = StringField()  # e.g., "Conference Paper", "Journal Article"
     venue = StringField()
+    core_rank = StringField(default="Unknown")  # ✅ New field for CORE rank
     citations = IntField(default=0)
     topics = ListField(StringField())
     links = ListField(URLField())
     
-    # Example of storing authors (besides the main author):
-    coauthors = ListField(StringField())  # or embed references if you want
+    # List of coauthors (names only)
+    coauthors = ListField(StringField())  # Alternatively, use embedded references
+
 
 class Author(Document):
+    """
+    MongoDB document representing an author with their research publications.
+    """
     pid = StringField(required=True, unique=True)
     name = StringField(required=True)
     dblp_url = URLField()
     affiliations = ListField(StringField())
     abstract = StringField()
-    
-    # Array of embedded Publication documents
+
+    # List of publications (Embedded)
     publications = EmbeddedDocumentListField(Publication)
-    
+
     created_at = DateTimeField(default=datetime.datetime.utcnow)
     updated_at = DateTimeField(default=datetime.datetime.utcnow)
 
     meta = {
-        'collection': 'authors'  # Name of the MongoDB collection
+        'collection': 'authors',  # Name of the MongoDB collection
+        'indexes': ['pid'],  # Indexing for faster retrieval
     }
 
     def save(self, *args, **kwargs):
-        """Override save to update `updated_at`."""
+        """Override save to update `updated_at` before saving."""
         self.updated_at = datetime.datetime.utcnow()
         return super(Author, self).save(*args, **kwargs)
