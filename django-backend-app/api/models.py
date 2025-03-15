@@ -22,6 +22,7 @@ class Publication(EmbeddedDocument):
     citations = IntField(default=0)
     topics = ListField(StringField())
     links = ListField(URLField())
+    abstract = StringField()
     
     # List of coauthors (names only)
     coauthors = EmbeddedDocumentListField(CoAuthor)  # ✅ Use CoAuthor embedded documents
