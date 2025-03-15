@@ -73,7 +73,8 @@ class DblpAuthorSearchService:
                         break
             
             # Generate abstract (using LLM service)
-            abstract = self._get_researcher_description(name=author_name, paper_titles=paper_titles)
+            abstract =  'bla bla'
+            #self._get_researcher_description(name=author_name, paper_titles=paper_titles)
 
             # Save to MongoDB
             author_doc = Author(
