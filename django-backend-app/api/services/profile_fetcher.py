@@ -5,8 +5,10 @@ from collections import defaultdict, Counter
 from utils.CORE import fuzzy_match 
 import pandas as pd
 from django.conf import settings
-from ..models import Author, Publication
+from ..models import Author, Publication, CoAuthor
 import logging
+import aiohttp
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +52,13 @@ class ProfileFetcher:
                     year=pub['year'],
                     paper_type=pub['type'],
                     venue=pub['venue'],
-                    core_rank=pub['core_rank'],  # ✅ Embedded CORE rank
+                    core_rank=pub['core_rank'],  # Embedded CORE rank
                     citations=pub['citations'],
                     topics=pub['topics'],
                     links=pub['links'],
-                    coauthors=[a['name'] for a in pub['authors'] if a['name'] != name]
+                    coauthors=[
+                        CoAuthor(name=a['name'], pid=a['pid']) for a in pub['authors'] if a['name'] != name
+                    ]
                 ) for pub in publications]
             )
         else:
@@ -70,11 +74,13 @@ class ProfileFetcher:
                     year=pub['year'],
                     paper_type=pub['type'],
                     venue=pub['venue'],
-                    core_rank=pub['core_rank'],  # ✅ Embedded CORE rank
+                    core_rank=pub['core_rank'],  # Embedded CORE rank
                     citations=pub['citations'],
                     topics=pub['topics'],
                     links=pub['links'],
-                    coauthors=[a['name'] for a in pub['authors'] if a['name'] != name]
+                    coauthors=[
+                        CoAuthor(name=a['name'], pid=a['pid']) for a in pub['authors'] if a['name'] != name
+                    ]
                 ) for pub in publications]
             )
             author_doc.save()
@@ -107,12 +113,13 @@ class ProfileFetcher:
 
         return publications, coauthors_dict, coauthor_pids, topic_counts
 
+
     def _parse_single_publication(self, publ_info, name, coauthors_dict, coauthor_pids, topic_counts):
         title = publ_info.findtext("title", "").strip()
         year = int(publ_info.findtext("year", "0") or 0)
         paper_type, venue = self._get_publication_type_and_venue(publ_info)
 
-        # ✅ Get CORE Rank for venue
+        # Get CORE Rank for venue
         core_rank = fuzzy_match(self.core_data, venue, 'name', 'abbreviation') or "Unknown"
 
         authors = []
@@ -135,7 +142,7 @@ class ProfileFetcher:
             "year": year,
             "type": paper_type,
             "venue": venue,
-            "core_rank": core_rank,  # ✅ Embedded rank
+            "core_rank": core_rank,  # Embedded rank
             "citations": 0,
             "topics": topics,
             "authors": authors,
@@ -169,7 +176,7 @@ class ProfileFetcher:
             "g-index": 2,  # Placeholder
             "total_papers": len(publications),
             "total_citations": 1000,  # Placeholder
-            "papers": publications,  # ✅ CORE Rank included per publication
+            "papers": publications,  # CORE Rank included per publication
             "topics": topics_list,
             "coauthors": coauthors_list
         }
@@ -187,11 +194,14 @@ class ProfileFetcher:
                     "year": pub.year,
                     "type": pub.paper_type,
                     "venue": pub.venue,
-                    "core_rank": pub.core_rank,  # ✅ Embedded core rank
+                    "core_rank": pub.core_rank,
                     "citations": pub.citations,
                     "topics": pub.topics,
                     "links": pub.links,
-                    "coauthors": pub.coauthors
+                    "abstract": pub.abstract,  # ✅ Also returning abstract
+                    "coauthors": [
+                        {"name": co.name, "pid": co.pid} for co in pub.coauthors  # ✅ Proper serialization
+                    ]
                 } for pub in author.publications
             ]
         }

@@ -6,6 +6,10 @@ from mongoengine import (
 import datetime
 
 
+class CoAuthor(EmbeddedDocument):
+    name = StringField(required=True)
+    pid = StringField()  # PID can be optional, but you can make it required if needed
+
 class Publication(EmbeddedDocument):
     """
     Embedded document representing a research publication.
@@ -14,13 +18,13 @@ class Publication(EmbeddedDocument):
     year = IntField(default=0)
     paper_type = StringField()  # e.g., "Conference Paper", "Journal Article"
     venue = StringField()
-    core_rank = StringField(default="Unknown")  # ✅ New field for CORE rank
+    core_rank = StringField(default="Unknown")  # New field for CORE rank
     citations = IntField(default=0)
     topics = ListField(StringField())
     links = ListField(URLField())
     
     # List of coauthors (names only)
-    coauthors = ListField(StringField())  # Alternatively, use embedded references
+    coauthors = EmbeddedDocumentListField(CoAuthor)  # ✅ Use CoAuthor embedded documents
 
 
 class Author(Document):
