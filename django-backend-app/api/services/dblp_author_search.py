@@ -105,6 +105,7 @@ class DblpAuthorSearchService:
             "abstract": author.abstract
         }
 
+"""
     def _get_researcher_description(self, name, paper_titles):
         url = "http://localhost:11434/api/generate"
 
@@ -140,3 +141,4 @@ class DblpAuthorSearchService:
                 return f"Error: Response format incorrect - {output_text}"
         else:
             return f"Error: {response.text}"
+ """   

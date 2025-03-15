@@ -282,187 +282,36 @@ class GitHubProfileView(APIView):
         '''
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
-    
+
+    # Instantiate keyword extractor once for efficiency
+    extractor = KeywordExtractor()
+
     def get(self, request):
         pid = request.GET.get('pid', '').strip()
-        pid = urllib.parse.unquote(pid)
-        logger.info(f"Received author details request with pid: {pid}")
 
         if not pid:
-            return Response({"error": "pid parameter is required."}, 
-                            status=status.HTTP_400_BAD_REQUEST)
-        
+            logger.warning("No PID provided in request")
+            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Fetching profile for PID: {pid}")
+
         try:
-            dblp_url = f'https://dblp.org/pid/{pid}.xml'
-            logger.info(f"Querying DBLP API: {dblp_url}")
-            dblp_response = requests.get(dblp_url)
-            dblp_response.raise_for_status()
+            fetcher = ProfileFetcher(pid, self.extractor)
+            profile_data = fetcher.fetch_profile()
 
-            if not dblp_response.text.strip():
-                logger.error(f"DBLP returned an empty response for PID: {pid}")
-                return Response({"error": "DBLP returned an empty response. PID may not exist."},
-                                status=status.HTTP_404_NOT_FOUND)
-
-            root = ET.fromstring(dblp_response.text)
-
-            name = root.get("name", "Unknown Researcher")
-            affiliations = [note.text for note in root.findall(".//note[@type='affiliation']")]
-
-            # Fetch or create the Author doc
-            author_doc = Author.objects(pid=pid).first()
-            if not author_doc:
-                author_doc = Author(pid=pid)
-            author_doc.name = name
-            author_doc.affiliations = affiliations
-
-            # We'll build up these details to return and/or store
-            pub_list = []                # Will hold embedded Publication objects
-            venue_counts = {}            # Count occurrences of each venue
-            coauthors_dict = defaultdict(int)  # coauthor -> count
-            coauthor_pids = {}                 # coauthor_name -> pid
-            topic_counts = Counter()
-            venues_list = []
-
-            # Parse publications
-            for pub in root.findall(".//r"):
-                publ_info = pub.find("./*")
-                if publ_info is not None:
-                    title = publ_info.findtext("title", "").strip()
-                    year_str = publ_info.findtext("year", "0")
-                    try:
-                        year = int(year_str)
-                    except ValueError:
-                        year = 0
-
-                    # Determine publication type
-                    if publ_info.tag == "inproceedings":
-                        paper_type = "Conference Paper"
-                        venue = publ_info.findtext("booktitle", "Unknown Conference")
-                    elif publ_info.tag == "article":
-                        paper_type = "Journal Article"
-                        venue = publ_info.findtext("journal", "Unknown Journal")
-                    elif publ_info.tag == "phdthesis":
-                        paper_type = "PhD Thesis"
-                        venue = "PhD Dissertation"
-                    elif publ_info.tag == "mastersthesis":
-                        paper_type = "Masters Thesis"
-                        venue = "Masters Dissertation"
-                    else:
-                        paper_type = "Other"
-                        venue = "Unknown Venue"
-
-                    # Count venue occurrences
-                    venues_list.append(venue)
-                    venue_counts[venue] = venue_counts.get(venue, 0) + 1
-
-                    # Extract authors (for coauthor info)
-                    paper_authors = []
-                    for author_node in publ_info.findall("author"):
-                        author_name = author_node.text
-                        author_pid = author_node.get("pid", "")
-                        paper_authors.append({"name": author_name, "pid": author_pid})
-
-                        # Track coauthor count, excluding the main researcher
-                        if author_name != name:
-                            coauthors_dict[author_name] += 1
-                            coauthor_pids[author_name] = author_pid
-
-                    # Extract links
-                    links = [ee.text for ee in publ_info.findall("ee")]
-
-                    # Stub for topic extraction
-                    abstract = "Some abstract here bla bla bla bla "
-                    # raw_topics = extractor.extract_keywords(doc=abstract)
-                    # topics = [topic[0] for topic in raw_topics]
-                    topics = ["bla", "bla"]  # Make it a list so Counter can work properly
-                    topic_counts.update(topics)
-
-                    # Create an EmbeddedDocument for each publication
-                    publication = Publication(
-                        title=title,
-                        year=year,
-                        paper_type=paper_type,
-                        venue=venue,
-                        citations=0,       # placeholder
-                        topics=topics,     # list of topics
-                        links=links
-                    )
-                    pub_list.append(publication)
-
-            # Now store the publication list in our Author doc
-            author_doc.publications = pub_list
-            author_doc.save()
-
-            # Fuzzy match for venue ranks (assuming you have fuzzy_match & core_data defined)
-            venue_ranks = {
-                venue: fuzzy_match(core_data, venue, 'name', 'abbreviation') 
-                for venue in venues_list
-            }
-
-            # Convert venue counts to required format
-            venue_list = [
-                {
-                    venue: {
-                        "count": count, 
-                        "core_rank": venue_ranks.get(venue, "Unknown")
-                    }
-                }
-                for venue, count in sorted(venue_counts.items(), key=lambda x: x[1], reverse=True)
-            ]
-
-            # Build topics list from the Counter
-            topics_list = [{topic: count} for topic, count in topic_counts.most_common()]
-
-            # Convert coauthors dictionary to list with coauthored publication count
-            coauthors_list = sorted(
-                [
-                    {
-                        "name": coauth_name, 
-                        "pid": coauthor_pids.get(coauth_name, ""), 
-                        "publications_together": count
-                    }
-                    for coauth_name, count in coauthors_dict.items()
-                ],
-                key=lambda x: x["publications_together"], 
-                reverse=True
-            )
-
-            # Prepare final data to return
-            # If you want to return the publication list in raw JSON, you can do something like:
-            publications_json = [
-                {
-                    "title": p.title,
-                    "year": p.year,
-                    "type": p.paper_type,
-                    "venue": p.venue,
-                    "citations": p.citations,
-                    "topics": p.topics,
-                    "links": p.links
-                }
-                for p in pub_list
-            ]
-
-            return Response({
-                "name": name,
-                "affiliations": affiliations,
-                "h-index": 3,  # Placeholder
-                "g-index": 2,  # Placeholder
-                "total_papers": len(pub_list),
-                "total_citations": 1000,  # Placeholder
-                "venues": venue_list,
-                "topics": topics_list,
-                "papers": publications_json,
-                "coauthors": coauthors_list,
-            }, status=status.HTTP_200_OK)
+            return Response(profile_data, status=status.HTTP_200_OK)
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error querying DBLP API: {e}")
-            return Response({"error": str(e)}, 
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except ET.ParseError as e:
-            logger.error(f"Error parsing DBLP XML: {e}")
-            return Response({"error": "Failed to parse DBLP XML."}, 
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Error fetching data from DBLP for PID {pid}: {e}")
+            return Response({"error": "Failed to fetch data from DBLP."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        except ValueError as e:
+            logger.error(f"Invalid PID or no data found for PID {pid}: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            logger.exception(f"Unexpected error occurred for PID {pid}: {e}")
+            return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GitHubProfileView(APIView):
