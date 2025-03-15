@@ -15,11 +15,11 @@ from utils.keybert import KeywordExtractor
 import string
 from .services.profile_fetcher import ProfileFetcher
 from .services.dblp_author_search import DblpAuthorSearchService
+from .services.openalex_service import OpenAlexFetcher
+import asyncio
+from api.models import Author  # Ensure this matches your models import path
 
 
-
-# core_data =  pd.read_csv('data/CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
-# core_data = core_data[['name', 'abbreviation', 'rank']]
 logger = logging.getLogger(__name__)
 
 
@@ -148,6 +148,7 @@ class DBLPSearchView(APIView):
         return Response({"authors": authors}, status=status.HTTP_200_OK)
 
 
+
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
 
@@ -180,6 +181,63 @@ class ResearcherProfileView(APIView):
         except Exception as e:
             logger.exception(f"Unexpected error occurred for PID {pid}: {e}")
             return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UpdateCitationsView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        pid = request.data.get("pid", "").strip()
+
+        if not pid:
+            logger.warning("No PID provided in request")
+            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Updating citations and abstracts for PID: {pid}")
+
+        try:
+            author = Author.objects(pid=pid).first()
+            if not author:
+                logger.warning(f"Author with PID {pid} not found in MongoDB.")
+                return Response({"error": "Author not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Collect all DOIs from publications
+            all_dois = []
+            for pub in author.publications:
+                all_dois.extend(OpenAlexFetcher.extract_dois(pub.links))
+            unique_dois = list(set(all_dois))
+
+            if not unique_dois:
+                logger.info(f"No DOIs found for author {pid}")
+                return Response({"message": "No DOIs found to update."}, status=status.HTTP_200_OK)
+
+            # Fetch OpenAlex data for all DOIs
+            openalex_data = asyncio.run(OpenAlexFetcher.fetch_openalex_data(unique_dois))
+            
+            # Rebuild the publications list with updated data
+            updated_publications = []
+            for pub in author.publications:
+                # pub_dois = OpenAlexFetcher.extract_dois(pub.links)
+                pub_dois = pub.links
+                main_doi = pub_dois[0] if pub_dois else None
+                if main_doi and main_doi in openalex_data:
+                    data = openalex_data[main_doi]
+                    pub.citations = data.get("cited_by_count", 0)
+                    pub.abstract = data.get("abstract", "")
+
+                updated_publications.append(pub)  # Add updated publication to list
+
+            # Reassign and save
+            author.publications = updated_publications
+            author.save()  # This will persist changes now
+
+            logger.info(f"Citations and abstracts updated for PID: {pid}")
+
+            return Response({"message": "Citations and abstracts updated successfully."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.exception(f"Error updating citations for PID {pid}: {e}")
+            return Response({"error": "Failed to update citations and abstracts."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class GitHubProfileView(APIView):
     permission_classes = [AllowAny]
@@ -260,21 +318,7 @@ class GitHubProfileView(APIView):
         return Response({"github_url": github_url}, status=status.HTTP_200_OK)
     
 
-
-
-#write compare researchers view here
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from api.models import Author  # Ensure this matches your models import path
-from api.services.profile_fetcher import ProfileFetcher
-import logging
-
-logger = logging.getLogger(__name__)
-
-# ✅ In-memory comparison list
 comparison_list = set()
-
 class CompareResearchersView(APIView):
     permission_classes = [AllowAny]
     """
