@@ -14,11 +14,11 @@ import xml.etree.ElementTree as ET
 from utils.keybert import KeywordExtractor
 import string
 from .services.profile_fetcher import ProfileFetcher
-from .services.dblp_author_search import DblpAuthorSearchService
+from .services.author_search import AuthorSearchService
 from .services.openalex_service import OpenAlexFetcher
 import asyncio
 from api.models import Author  # Ensure this matches your models import path
-
+import time 
 
 logger = logging.getLogger(__name__)
 
@@ -131,17 +131,19 @@ class PaperDetailsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class DBLPSearchView(APIView):
+class SearchView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        start_time = time.time()
         search_query = request.GET.get('query', '').strip()
         if not search_query:
             return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        search_service = DblpAuthorSearchService(search_query)
-        authors = search_service.search_authors()
-
+        search_service = AuthorSearchService(search_query)
+        authors = search_service.search_single_author()
+        end_time = time.time()
+        print("Time taken to process:", end_time - start_time)
         if not authors:
             return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -156,31 +158,33 @@ class ResearcherProfileView(APIView):
     extractor = KeywordExtractor()
 
     def get(self, request):
-        pid = request.GET.get('pid', '').strip()
+        author_name = request.GET.get('author_name', '').strip()
 
-        if not pid:
-            logger.warning("No PID provided in request")
-            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not author_name:
+            logger.warning("No NAME provided in request")
+            return Response({"error": "NAME parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        logger.info(f"Fetching profile for PID: {pid}")
+        logger.info(f"Fetching profile for PID: {author_name}")
 
         try:
-            fetcher = ProfileFetcher(pid, self.extractor)
+            fetcher = ProfileFetcher(author_name, self.extractor)
             profile_data = fetcher.fetch_profile()
 
             return Response(profile_data, status=status.HTTP_200_OK)
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching data from DBLP for PID {pid}: {e}")
+            logger.error(f"Error fetching data from DBLP for NAME {author_name}: {e}")
             return Response({"error": "Failed to fetch data from DBLP."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         except ValueError as e:
-            logger.error(f"Invalid PID or no data found for PID {pid}: {e}")
+            logger.error(f"Invalid NAME or no data found for NAME {author_name}: {e}")
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
-            logger.exception(f"Unexpected error occurred for PID {pid}: {e}")
+            logger.exception(f"Unexpected error occurred for NAME {author_name}: {e}")
             return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 class UpdateCitationsView(APIView):
     permission_classes = [AllowAny]
@@ -349,16 +353,16 @@ class CompareResearchersView(APIView):
         if not author:
             try:
                 logger.info(f"Fetching new researcher data for {pid}")
-                fetcher = ProfileFetcher(pid)
+                fetcher = ProfileFetcher(pid, extractor=KeywordExtractor())
                 profile_data = fetcher.fetch_profile()
 
-                # ✅ Store new author in MongoDB
+                # Store new author in MongoDB
                 new_author = Author(
                     pid=profile_data["pid"],
                     name=profile_data["name"],
                     affiliations=profile_data["affiliations"],
                     dblp_url=profile_data.get("dblp_url", ""),
-                    abstract=profile_data.get("abstract", ""),
+                    description=profile_data.get("description", ""),
                     publications=[
                         {
                             "title": pub["title"],
@@ -374,7 +378,7 @@ class CompareResearchersView(APIView):
                 )
                 new_author.save()
 
-                # ✅ Add to comparison list
+                # Add to comparison list
                 comparison_list.add(pid)
 
                 return Response({"message": "Researcher added to comparison list.", "profile": profile_data}, status=status.HTTP_201_CREATED)
@@ -382,7 +386,7 @@ class CompareResearchersView(APIView):
                 logger.error(f"Failed to fetch researcher {pid}: {e}")
                 return Response({"error": "Failed to fetch researcher data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # ✅ Add researcher to comparison list if already exists in MongoDB
+        # Add researcher to comparison list if already exists in MongoDB
         comparison_list.add(pid)
         return Response({"message": "Researcher added to comparison list."}, status=status.HTTP_200_OK)
 
