@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import unquote
 import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,7 +11,6 @@ from rest_framework.authtoken.models import Token  # For token-based auth
 from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
 import xml.etree.ElementTree as ET
-##from utils.LLM import get_researcher_description
 from utils.keybert import KeywordExtractor
 import string
 from .services.profile_fetcher import ProfileFetcher
@@ -20,19 +20,7 @@ from .services.dblp_author_search import DblpAuthorSearchService
 
 # core_data =  pd.read_csv('data/CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
 # core_data = core_data[['name', 'abbreviation', 'rank']]
-import difflib
-import urllib.parse
-from collections import Counter, defaultdict
-import pandas as pd
-
-from .models import Author , Publication # Import your MongoEngine model
-
-
-
-
-extractor = KeywordExtractor()
-core_data =  pd.read_csv('data/CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
-core_data = core_data [['name', 'abbreviation', 'rank']]
+logger = logging.getLogger(__name__)
             
 # Set up logging
 logger = logging.getLogger(__name__)

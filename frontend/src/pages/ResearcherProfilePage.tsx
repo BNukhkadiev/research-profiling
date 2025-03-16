@@ -125,7 +125,12 @@ const ResearcherProfilePage: React.FC = () => {
           <CommonTopicsCard topics={topics} />
         </Box>
         <Box sx={{ width: "50%" }}>
-          <ResearchersWork author={researcherProfile?.name || ""} authorId={pid} publications={publications} />
+        <ResearchersWork
+          author={researcherProfile?.name || ""}
+          authorId={pid}
+          affiliations={researcherProfile?.affiliations || []}  // <--- This is good
+          publications={publications}
+        />
         </Box>
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <StatisticsCard author={statistics} />
