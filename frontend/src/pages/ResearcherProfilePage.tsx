@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
@@ -8,49 +8,27 @@ import VenuesCard from "../components/VenuesCard";
 import CommonTopicsCard from "../components/CommonTopicsCard";
 import Filters from "../components/Filters";
 import StatisticsCard from "../components/StatisticsCard";
-import CoauthorsList from "../components/CoauthorsList"; // ✅ Using corrected CoauthorsList
+import CoauthorsList from "../components/CoauthorsList";
 import ResearchersWork from "../components/ResearchersWork";
-import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery"; // ✅ Correct import
+import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery";
 
 const ResearcherProfilePage: React.FC = () => {
-  const { name } = useParams<{ name: string }>(); // ✅ 'name' from URL
+  const { name } = useParams<{ name: string }>();
 
-  // Fetch researcher data using React Query
+  const [filters, setFilters] = useState<{
+    yearRange: [number, number] | null;
+    venue: string[];
+    coreRanking: string | null;
+    sort: "asc" | "desc" | null;
+  }>({
+    yearRange: null,
+    venue: [],
+    coreRanking: null,
+    sort: null,
+  });
+
   const { data: researcherProfile, isLoading, isError, error } = useResearcherProfileQuery(name || "");
 
-  // Handle missing name param
-  if (!name) {
-    return (
-      <Box sx={{ padding: 4, textAlign: "center" }}>
-        <Typography variant="h4" color="error">
-          Researcher name is missing!
-        </Typography>
-      </Box>
-    );
-  }
-
-  // Handle loading state
-  if (isLoading) {
-    return (
-      <Box sx={{ padding: 4, textAlign: "center" }}>
-        <Typography variant="h4">Loading data...</Typography>
-      </Box>
-    );
-  }
-
-  // Handle error state
-  if (isError) {
-    console.error("Error fetching researcher profile:", error);
-    return (
-      <Box sx={{ padding: 4, textAlign: "center" }}>
-        <Typography variant="h4" color="error">
-          Failed to fetch researcher profile. Please try again later.
-        </Typography>
-      </Box>
-    );
-  }
-
-  // ✅ Destructure response with safe fallbacks
   const {
     name: authorName = "Unknown Author",
     affiliations = [],
@@ -65,62 +43,140 @@ const ResearcherProfilePage: React.FC = () => {
 
   const statistics = { papers: totalPapers, citations: totalCitations, hIndex, gIndex };
 
-  // ✅ Aggregate venues from papers (since backend doesn't return venues directly)
-  const aggregatedVenuesMap = papers.reduce((acc: Record<string, { count: number; coreRank: string }>, paper) => {
+  const availableVenues = [...new Set(papers.map((p) => p.venue))];
+
+  // ✅ Apply filters to papers
+  const filteredPapers = useMemo(() => {
+    let filtered = [...papers];
+
+    if (filters.venue.length > 0) {
+      filtered = filtered.filter((paper) => filters.venue.includes(paper.venue));
+    }
+
+    if (filters.coreRanking) {
+      filtered = filtered.filter((paper) => paper.coreRank === filters.coreRanking);
+    }
+
+    if (filters.yearRange) {
+      filtered = filtered.filter(
+        (paper) => paper.year >= filters.yearRange![0] && paper.year <= filters.yearRange![1]
+      );
+    }
+
+    if (filters.sort) {
+      filtered = filtered.sort((a, b) => (filters.sort === "asc" ? a.year - b.year : b.year - a.year));
+    }
+
+    return filtered;
+  }, [papers, filters]);
+
+  // ✅ Aggregate filtered venues
+  const filteredVenuesMap = filteredPapers.reduce((acc: Record<string, { count: number; coreRank: string }>, paper) => {
     if (paper.venue) {
       const venueName = paper.venue;
       if (!acc[venueName]) {
-        acc[venueName] = { count: 0, coreRank: paper.coreRank || "N/A" }; // Use paper's core_rank if present
+        acc[venueName] = { count: 0, coreRank: paper.coreRank || "N/A" };
       }
       acc[venueName].count += 1;
     }
     return acc;
   }, {});
 
-  // ✅ Convert venue map to array
-  const venues = Object.entries(aggregatedVenuesMap).map(([name, data]) => ({
+  const filteredVenues = Object.entries(filteredVenuesMap).map(([name, data]) => ({
     name,
     count: data.count,
     coreRank: data.coreRank,
   }));
 
-  // ✅ Optional filter handling (not wired fully)
-  const handleFilterChange = (filters: any) => {
-    console.log("Filters changed:", filters);
+  // ✅ Aggregate filtered topics
+  const filteredTopicsMap = filteredPapers.reduce((acc: Record<string, number>, paper) => {
+    paper.topics?.forEach((topic) => {
+      acc[topic] = (acc[topic] || 0) + 1;
+    });
+    return acc;
+  }, {});
+
+  const filteredTopics = Object.entries(filteredTopicsMap).map(([name, count]) => ({ name, count }));
+
+  // ✅ Aggregate filtered coauthors
+  const filteredCoauthorsMap = filteredPapers.reduce((acc: Record<string, number>, paper) => {
+    paper.authors?.forEach((author) => {
+      if (author.name !== authorName) {
+        acc[author.name] = (acc[author.name] || 0) + 1;
+      }
+    });
+    return acc;
+  }, {});
+
+  const filteredCoauthors = Object.entries(filteredCoauthorsMap).map(([name, publicationsTogether]) => ({
+    name,
+    publicationsTogether,
+  }));
+
+  const handleFilterChange = (newFilters: any) => {
+    setFilters(newFilters);
   };
 
+  // ⚠️ Hooks are done — below are conditional returns, safe now:
+  if (!name) {
+    return (
+      <Box sx={{ padding: 4, textAlign: "center" }}>
+        <Typography variant="h4" color="error">
+          Researcher name is missing!
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Box sx={{ padding: 4, textAlign: "center" }}>
+        <Typography variant="h4">Loading data...</Typography>
+      </Box>
+    );
+  }
+
+  if (isError) {
+    console.error("Error fetching researcher profile:", error);
+    return (
+      <Box sx={{ padding: 4, textAlign: "center" }}>
+        <Typography variant="h4" color="error">
+          Failed to fetch researcher profile. Please try again later.
+        </Typography>
+      </Box>
+    );
+  }
+
+  // ✅ Render final responsive and filtered page:
   return (
     <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
-      {/* Filters (Optional future functionality) */}
-      <Filters onFilterChange={handleFilterChange} />
+      <Filters onFilterChange={handleFilterChange} availableVenues={availableVenues} />
 
-      {/* Profile Header */}
       <ProfileHeader
         author={authorName}
-        profileUrl={`https://dblp.org/search?q=${encodeURIComponent(authorName)}`} // Optional external link to DBLP search
+        profileUrl={`https://dblp.org/search?q=${encodeURIComponent(authorName)}`}
         affiliations={affiliations.length > 0 ? affiliations.join(", ") : "Affiliations not available"}
-        addToCompare={() => console.log(`Add to Compare Clicked for ${authorName}`)} // Optional for future feature
-        isSelected={false} // Placeholder for compare logic
+        addToCompare={() => console.log(`Add to Compare Clicked for ${authorName}`)}
+        isSelected={false}
       />
 
-      {/* Main Content */}
       <Box sx={{ display: "flex", gap: 4, marginTop: 4 }}>
-        {/* Left Column */}
+        {/* Left */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
-          <AwardsCard /> {/* Placeholder, can be implemented or removed */}
-          <VenuesCard venues={venues} /> {/* ✅ Now venues are correctly computed */}
-          <CommonTopicsCard topics={topics} />
+          <AwardsCard />
+          <VenuesCard venues={filteredVenues} /> {/* Responsive venues */}
+          <CommonTopicsCard topics={filteredTopics} /> {/* Responsive topics */}
         </Box>
 
-        {/* Center Column */}
+        {/* Center */}
         <Box sx={{ width: "50%", display: "flex", flexDirection: "column", gap: 2 }}>
-          <ResearchersWork author={authorName} publications={papers} />
+          <ResearchersWork author={authorName} publications={filteredPapers} />
         </Box>
 
-        {/* Right Column */}
+        {/* Right */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <StatisticsCard author={statistics} />
-          <CoauthorsList coauthors={coauthors} />
+          <CoauthorsList coauthors={filteredCoauthors} /> {/* Responsive coauthors */}
         </Box>
       </Box>
     </Box>
