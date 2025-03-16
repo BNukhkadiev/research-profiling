@@ -33,7 +33,6 @@ Open your terminal and run:
 ```bash
 crontab -e
 
-
 ### 3. Add the Cron Job Entry
 
 # Set your base directory
@@ -64,3 +63,9 @@ If you’re using vim, press Esc, type :wq, and then press Enter.
 
 ### 5. Verfiy the Cron Job
 crontab -l
+
+
+## Troubleshooting
+Ensure your scripts are executable, For example: 
+chmod +x $BASE_DIR/datasets/download_dblp.sh
+chmod +x $PROJECT_DIR/run_refresh.sh
