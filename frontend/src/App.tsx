@@ -15,7 +15,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchResultsPage />} />
-        <Route path="/profile/:pid" element={<ResearcherProfilePage />} />{" "}
+        <Route path="/profile/:name" element={<ResearcherProfilePage />} />{" "}
         {/* Updated Route */}
         {/* Updated Route */}
         <Route

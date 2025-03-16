@@ -8,29 +8,28 @@ import VenuesCard from "../components/VenuesCard";
 import CommonTopicsCard from "../components/CommonTopicsCard";
 import Filters from "../components/Filters";
 import StatisticsCard from "../components/StatisticsCard";
-import CoauthorsSection from "../components/CoauthorsSection";
+import CoauthorsList from "../components/CoauthorsList"; // ✅ Using corrected CoauthorsList
 import ResearchersWork from "../components/ResearchersWork";
-import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery"; // Updated import path
+import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery"; // ✅ Correct import
 
 const ResearcherProfilePage: React.FC = () => {
-  const { pid } = useParams<{ pid: string }>();
+  const { name } = useParams<{ name: string }>(); // ✅ 'name' from URL
 
-  const { data: researcherProfile, isLoading, isError, error } = useResearcherProfileQuery(pid || "");
+  // Fetch researcher data using React Query
+  const { data: researcherProfile, isLoading, isError, error } = useResearcherProfileQuery(name || "");
 
-  const handleFilterChange = (filters: any) => {
-    console.log("Filters changed:", filters);
-  };
-
-  if (!pid) {
+  // Handle missing name param
+  if (!name) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
         <Typography variant="h4" color="error">
-          Researcher ID is missing!
+          Researcher name is missing!
         </Typography>
       </Box>
     );
   }
 
+  // Handle loading state
   if (isLoading) {
     return (
       <Box sx={{ padding: 4, textAlign: "center" }}>
@@ -39,6 +38,7 @@ const ResearcherProfilePage: React.FC = () => {
     );
   }
 
+  // Handle error state
   if (isError) {
     console.error("Error fetching researcher profile:", error);
     return (
@@ -50,13 +50,12 @@ const ResearcherProfilePage: React.FC = () => {
     );
   }
 
-  // Destructure and provide fallback empty arrays
+  // ✅ Destructure response with safe fallbacks
   const {
-    name = "Unknown Author",
+    name: authorName = "Unknown Author",
     affiliations = [],
-    venues = [],
-    topics = [],
     papers = [],
+    topics = [],
     coauthors = [],
     totalPapers = 0,
     totalCitations = 0,
@@ -66,31 +65,62 @@ const ResearcherProfilePage: React.FC = () => {
 
   const statistics = { papers: totalPapers, citations: totalCitations, hIndex, gIndex };
 
+  // ✅ Aggregate venues from papers (since backend doesn't return venues directly)
+  const aggregatedVenuesMap = papers.reduce((acc: Record<string, { count: number; coreRank: string }>, paper) => {
+    if (paper.venue) {
+      const venueName = paper.venue;
+      if (!acc[venueName]) {
+        acc[venueName] = { count: 0, coreRank: paper.coreRank || "N/A" }; // Use paper's core_rank if present
+      }
+      acc[venueName].count += 1;
+    }
+    return acc;
+  }, {});
+
+  // ✅ Convert venue map to array
+  const venues = Object.entries(aggregatedVenuesMap).map(([name, data]) => ({
+    name,
+    count: data.count,
+    coreRank: data.coreRank,
+  }));
+
+  // ✅ Optional filter handling (not wired fully)
+  const handleFilterChange = (filters: any) => {
+    console.log("Filters changed:", filters);
+  };
+
   return (
     <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
+      {/* Filters (Optional future functionality) */}
       <Filters onFilterChange={handleFilterChange} />
+
+      {/* Profile Header */}
       <ProfileHeader
-        author={name}
-        profileUrl={`https://dblp.org/pid/${pid}`}
+        author={authorName}
+        profileUrl={`https://dblp.org/search?q=${encodeURIComponent(authorName)}`} // Optional external link to DBLP search
         affiliations={affiliations.length > 0 ? affiliations.join(", ") : "Affiliations not available"}
-        addToCompare={() => console.log(`Add to Compare Clicked for ${name}`)}
-        isSelected={false}
+        addToCompare={() => console.log(`Add to Compare Clicked for ${authorName}`)} // Optional for future feature
+        isSelected={false} // Placeholder for compare logic
       />
+
+      {/* Main Content */}
       <Box sx={{ display: "flex", gap: 4, marginTop: 4 }}>
-        {/* Left column */}
+        {/* Left Column */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
-          <AwardsCard />
-          <VenuesCard venues={venues} />
+          <AwardsCard /> {/* Placeholder, can be implemented or removed */}
+          <VenuesCard venues={venues} /> {/* ✅ Now venues are correctly computed */}
           <CommonTopicsCard topics={topics} />
         </Box>
-        {/* Center column */}
-        <Box sx={{ width: "50%" }}>
-          <ResearchersWork author={name} authorId={pid} publications={papers} />
+
+        {/* Center Column */}
+        <Box sx={{ width: "50%", display: "flex", flexDirection: "column", gap: 2 }}>
+          <ResearchersWork author={authorName} publications={papers} />
         </Box>
-        {/* Right column */}
+
+        {/* Right Column */}
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
           <StatisticsCard author={statistics} />
-          <CoauthorsSection coauthors={coauthors} />
+          <CoauthorsList coauthors={coauthors} />
         </Box>
       </Box>
     </Box>

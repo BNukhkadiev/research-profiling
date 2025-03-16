@@ -1,13 +1,10 @@
 import React from "react";
 import { Box, Typography, Button, Tooltip } from "@mui/material";
-import { Link } from "react-router-dom";
 
 interface SearchCardProps {
   name: string;
   affiliations: string[];
-  pid: string;
-  dblp_url: string;
-  abstract: string;
+  description: string;
   addToCompare: () => void;
   isSelected: boolean;
   onViewProfile: () => void; // Function to navigate to profile page
@@ -16,15 +13,11 @@ interface SearchCardProps {
 const SearchCard: React.FC<SearchCardProps> = ({
   name,
   affiliations,
-  pid,
-  dblp_url,
-  abstract,
+  description,
   addToCompare,
   isSelected,
   onViewProfile,
 }) => {
-  const encodedPid = encodeURIComponent(pid); // Encode PID properly for URL
-
   return (
     <Box
       sx={{
@@ -39,6 +32,7 @@ const SearchCard: React.FC<SearchCardProps> = ({
         },
       }}
     >
+      {/* Researcher Name */}
       <Typography
         variant="h6"
         sx={{
@@ -49,6 +43,7 @@ const SearchCard: React.FC<SearchCardProps> = ({
         {name}
       </Typography>
 
+      {/* Affiliations */}
       <Tooltip
         title={
           affiliations.length > 0
@@ -75,7 +70,7 @@ const SearchCard: React.FC<SearchCardProps> = ({
         </Typography>
       </Tooltip>
 
-      {/* Researcher abstract */}
+      {/* Researcher Description */}
       <Typography
         variant="body2"
         color="textPrimary"
@@ -87,9 +82,10 @@ const SearchCard: React.FC<SearchCardProps> = ({
           textOverflow: "ellipsis",
         }}
       >
-        {abstract}
+        {description || "No description available"}
       </Typography>
 
+      {/* Action Buttons */}
       <Box
         sx={{
           display: "flex",
@@ -101,24 +97,13 @@ const SearchCard: React.FC<SearchCardProps> = ({
         {/* Navigate to Researcher Profile Page */}
         <Button
           variant="outlined"
-          component={Link}
-          to={`/profile/${encodedPid}`} // Navigate to researcher profile
+          onClick={onViewProfile}
           sx={{ textTransform: "none" }}
         >
           View Profile
         </Button>
 
-        {/* Open DBLP Profile */}
-        <Button
-          variant="outlined"
-          href={dblp_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          sx={{ textTransform: "none" }}
-        >
-          View on DBLP
-        </Button>
-
+        {/* Add/Remove to/from Compare */}
         <Button
           variant="contained"
           onClick={addToCompare}

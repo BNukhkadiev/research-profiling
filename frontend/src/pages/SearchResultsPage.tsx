@@ -5,7 +5,7 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import SearchCard from "../components/SearchCard"; // Researcher card
-import { useResearchersQuery } from "../react-query/useResearchersQuery";
+import { useResearcherQuery } from "../react-query/useResearchersQuery"; // ✅ Make sure this is singular now!
 import {
   useComparisonResearchers,
   useAddResearcher,
@@ -28,9 +28,10 @@ const SearchResultsPage: React.FC = () => {
   const addResearcherMutation = useAddResearcher();
   const removeResearcherMutation = useRemoveResearcher();
 
-  // ✅ Fetch researchers based on search query
-  const { data: researchers = [], isLoading: loadingResearchers } =
-    useResearchersQuery(activeTab === "researchers" ? searchQuery : "");
+  // ✅ Fetch single researcher based on search query
+  const { data: researcher, isLoading: loadingResearchers } = useResearcherQuery(
+    activeTab === "researchers" ? searchQuery : ""
+  );
 
   // ✅ Trigger search
   const handleSearch = () => {
@@ -39,11 +40,11 @@ const SearchResultsPage: React.FC = () => {
   };
 
   // ✅ Add/remove researcher from comparison list (Instant UI Update)
-  const handleToggleCompare = (pid: string) => {
-    if (comparisonList.includes(pid)) {
-      removeResearcherMutation.mutate(pid);
+  const handleToggleCompare = (name: string) => {
+    if (comparisonList.includes(name)) {
+      removeResearcherMutation.mutate(name);
     } else {
-      addResearcherMutation.mutate(pid);
+      addResearcherMutation.mutate(name);
     }
   };
 
@@ -85,7 +86,7 @@ const SearchResultsPage: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Get to Comparison Button */}
+      {/* Go to Comparison Button */}
       {activeTab === "researchers" && (
         <Box sx={{ marginBottom: 3, textAlign: "right" }}>
           <Button
@@ -101,27 +102,22 @@ const SearchResultsPage: React.FC = () => {
       {/* Display Results */}
       {loadingResearchers || loadingComparison ? (
         <Typography>Loading...</Typography>
-      ) : (
-        <Box>
-          {activeTab === "researchers"
-            ? researchers.map((researcher) => (
-                <SearchCard
-                  key={researcher.pid}
-                  name={researcher.name}
-                  affiliations={researcher.affiliations}
-                  pid={researcher.pid}
-                  dblp_url={researcher.dblp_url}
-                  abstract={researcher.abstract}
-                  addToCompare={() => handleToggleCompare(researcher.pid)}
-                  isSelected={comparisonList.includes(researcher.pid)}
-                  onViewProfile={() =>
-                    navigate(`/profile/${encodeURIComponent(researcher.pid)}`)
-                  }
-                />
-              ))
-            : null}
-        </Box>
-      )}
+      ) : activeTab === "researchers" ? (
+        researcher ? (
+          <SearchCard
+            name={researcher.name}
+            affiliations={researcher.affiliations}
+            description={researcher.description}
+            addToCompare={() => handleToggleCompare(researcher.name)}
+            isSelected={comparisonList.includes(researcher.name)}
+            onViewProfile={() =>
+              navigate(`/profile/${encodeURIComponent(researcher.name)}`)
+            }
+          />
+        ) : (
+          <Typography>No researcher found.</Typography>
+        )
+      ) : null}
     </Box>
   );
 };
