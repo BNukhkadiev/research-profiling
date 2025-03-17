@@ -1,145 +1,179 @@
 import React, { useState } from "react";
-import { Box, Typography, Button, Stack, Link } from "@mui/material";
+import { Box, Typography, Button, Stack, Link, DialogContent, DialogActions, Dialog, DialogTitle } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-interface PublicationsListProps {
-  publications: {
-    title: string;
-    year: number;
-    type: string;
-    venue: string;
-    citations: number;
-    topics: string[];
-    authors: { name: string; pid: string }[];
-    links: string[];
-  }[];
+// Define the Publication interface
+export interface Publication {
+  id: string; // Unique identifier
+  url: string;
+  title: string;
+  year: number;
+  venue?: string;
+  authors: { name: string; id?: string }[];
+  citationCount?: number;
+  topics?: string[];
+  abstract?: string;
 }
 
-const PublicationsList: React.FC<PublicationsListProps> = ({ publications = [] }) => {
-  const navigate = useNavigate();
-  const [visibleCount, setVisibleCount] = useState(5); // Show 5 publications initially
+interface PublicationsListProps {
+  publications: Publication[];
+  filters: any; // Replace with your FilterState type if needed
+  mainAuthorId?: string; // Optionally exclude main author from coauthors
+}
 
-  const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5);
+/**
+ * PublicationItem displays the publication details using data from the publication object.
+ * It provides a "Go to Publication" button to open the URL.
+ */
+const PublicationItem: React.FC<{
+  pub: Publication;
+  mainAuthorId?: string;
+  onViewDetails: (pub: Publication) => void;
+}> = ({ pub, mainAuthorId, onViewDetails }) => {
+  const citationCount = pub.citationCount ?? 0;
+  const url = pub.url && pub.url !== "N/A" ? pub.url : "";
+
+  const renderCoauthors = () => {
+    if (!pub.authors || pub.authors.length === 0) return "Unknown Authors";
+    const coauthors = mainAuthorId
+      ? pub.authors.filter((a) => a.id !== mainAuthorId)
+      : pub.authors;
+    return coauthors.map((a) => a.name).join(", ");
   };
 
-  const handleViewDetails = (publicationUrl: string) => {
-    if (!publicationUrl) return; // Safe guard
-    const publicationId = publicationUrl.split("/").pop() || "";
-    navigate(`/publication/${publicationId}`);
-  };
+  return (
+    <Box sx={{ padding: 2, border: "1px solid #ddd", marginBottom: 2 }}>
+      <Typography variant="h6">{pub.title || "Untitled Publication"}</Typography>
+      <Typography>{pub.venue || "Unknown Venue"}</Typography>
+      <Typography>Year: {pub.year}</Typography>
 
-  if (!publications.length) {
-    return (
-      <Typography variant="body1" color="textSecondary">
-        No publications available for this author.
+      {/* Citation Count */}
+      <Typography variant="body2" color="textSecondary">
+        Citations: {citationCount}
       </Typography>
-    );
-  }
+
+      {/* Topics */}
+      {pub.topics && pub.topics.length > 0 && (
+        <Typography variant="body2" color="textSecondary">
+          Topics: {pub.topics.join(", ")}
+        </Typography>
+      )}
+
+      {/* Coauthors */}
+      <Typography variant="body2" color="textSecondary">
+        Coauthors: {renderCoauthors()}
+      </Typography>
+
+      {/* Buttons */}
+      <Box sx={{ marginTop: 1, display: "flex", gap: 1 }}>
+        {url ? (
+          <Button
+            variant="outlined"
+            onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+          >
+            Go to Publication
+          </Button>
+        ) : (
+          <Typography variant="body2">URL: N/A</Typography>
+        )}
+        <Button variant="contained" onClick={() => onViewDetails(pub)}>
+          View Details
+        </Button>
+      </Box>
+    </Box>
+  );
+};
+
+const PublicationsList: React.FC<PublicationsListProps> = ({
+  publications,
+  filters,
+  mainAuthorId,
+}) => {
+  const [visibleCount, setVisibleCount] = useState(5);
+  const [selectedPublication, setSelectedPublication] =
+    useState<Publication | null>(null);
+
+  const handleLoadMore = () => setVisibleCount((prev) => prev + 5);
+  const handleViewDetails = (pub: Publication) => setSelectedPublication(pub);
+  const handleCloseDetails = () => setSelectedPublication(null);
 
   return (
     <Box>
-      {publications.slice(0, visibleCount).map((pub, index) => {
-        const {
-          title = "Untitled Publication",
-          authors = [],
-          venue = "Unknown Venue",
-          year = "Unknown Year",
-          type = "Unknown Type",
-          citations,
-          topics = [],
-          links = [],
-        } = pub;
+      {publications.slice(0, visibleCount).map((pub) => (
+        <PublicationItem
+          key={pub.id}
+          pub={pub}
+          mainAuthorId={mainAuthorId}
+          onViewDetails={handleViewDetails}
+        />
+      ))}
 
-        return (
-          <Box
-            key={`${title}-${index}`} // More stable key
-            sx={{
-              p: 2,
-              mb: 2,
-              border: "1px solid #ddd",
-              borderRadius: 2,
-              backgroundColor: "#fafafa",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            }}
-          >
-            {/* Title */}
-            <Typography variant="h6" gutterBottom>
-              {title}
-            </Typography>
-
-            {/* Authors */}
-            <Typography variant="body2" color="textSecondary" gutterBottom>
-              <strong>Authors:</strong>{" "}
-              {authors.length > 0
-                ? authors.map((author, idx) => (
-                    <React.Fragment key={author.pid || `${author.name}-${idx}`}>
-                      {author.pid ? (
-                        <Link
-                          href={`/profile/${encodeURIComponent(author.pid)}`}
-                          style={{ textDecoration: "none" }}
-                        >
-                          {author.name}
-                        </Link>
-                      ) : (
-                        author.name
-                      )}
-                      {idx < authors.length - 1 && ", "}
-                    </React.Fragment>
-                  ))
-                : "Unknown Authors"}
-            </Typography>
-
-            {/* Venue & Year */}
-            <Typography variant="body2" color="textSecondary" gutterBottom>
-              <strong>Venue:</strong> {venue} | <strong>Year:</strong> {year}
-            </Typography>
-
-            {/* Type */}
-            <Typography variant="body2" color="textSecondary" gutterBottom>
-              <strong>Type:</strong> {type}
-            </Typography>
-
-            {/* Citations */}
-            <Typography variant="body2" color="textSecondary" gutterBottom>
-              <strong>Citations:</strong> {citations !== undefined ? citations : "N/A"}
-            </Typography>
-
-            {/* Topics */}
-            {topics.length > 0 && (
-              <Typography variant="body2" color="textSecondary" gutterBottom>
-                <strong>Topics:</strong> {topics.join(", ")}
-              </Typography>
-            )}
-
-            {/* View Details Button */}
-            {links.length > 0 && links[0] && (
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => handleViewDetails(links[0])}
-                sx={{ textTransform: "none", mt: 1 }}
-              >
-                View Details
-              </Button>
-            )}
-          </Box>
-        );
-      })}
-
-      {/* Load More Button */}
       {visibleCount < publications.length && (
-        <Stack alignItems="center" mt={2}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleLoadMore}
-            sx={{ textTransform: "none" }}
-          >
-            Load More
-          </Button>
-        </Stack>
+        <Button variant="contained" onClick={handleLoadMore}>
+          Load More
+        </Button>
       )}
+
+      <Dialog open={Boolean(selectedPublication)} onClose={handleCloseDetails}>
+        {selectedPublication && (
+          <>
+            <DialogTitle>{selectedPublication.title}</DialogTitle>
+            <DialogContent>
+              <Typography>
+                <strong>Venue:</strong>{" "}
+                {selectedPublication.venue || "Unknown Venue"}
+              </Typography>
+              <Typography>
+                <strong>Year:</strong> {selectedPublication.year}
+              </Typography>
+              <Typography>
+                <strong>Authors:</strong>{" "}
+                {selectedPublication.authors.map((a) => a.name).join(", ")}
+              </Typography>
+              <Typography>
+                <strong>Citations:</strong>{" "}
+                {selectedPublication.citationCount ?? 0}
+              </Typography>
+              {selectedPublication.topics &&
+                selectedPublication.topics.length > 0 && (
+                  <Typography>
+                    <strong>Topics:</strong>{" "}
+                    {selectedPublication.topics.join(", ")}
+                  </Typography>
+                )}
+              <Typography>
+                <strong>Coauthors:</strong>{" "}
+                {selectedPublication.authors
+                  .filter((a) => a.id !== mainAuthorId)
+                  .map((a) => a.name)
+                  .join(", ") || "Unknown Authors"}
+              </Typography>
+              <Typography>
+                <strong>URL:</strong>{" "}
+                {selectedPublication.url && selectedPublication.url !== "N/A" ? (
+                  <a
+                    href={selectedPublication.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {selectedPublication.url}
+                  </a>
+                ) : (
+                  "N/A"
+                )}
+              </Typography>
+              {selectedPublication.abstract && (
+                <Typography>
+                  <strong>Abstract:</strong> {selectedPublication.abstract}
+                </Typography>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDetails}>Close</Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 };

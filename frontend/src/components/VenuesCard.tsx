@@ -1,19 +1,13 @@
 import React, { useState } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Button,
-} from "@mui/material";
+import { Table, TableBody, TableCell, TableRow, Button } from "@mui/material";
+import { getCoreRanking } from "../utilities/coreRankings";
 
-interface VenueData {
+export interface VenueData {
   name: string;
   count: number;
-  coreRank: string;
+  coreRank?: string;
 }
 
 interface VenuesCardProps {
@@ -21,11 +15,10 @@ interface VenuesCardProps {
 }
 
 const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
-  const [visibleCount, setVisibleCount] = useState(5); // Number of venues to display initially
+  const [visibleCount, setVisibleCount] = useState(5);
 
-  // Load more venues by 5
   const handleLoadMore = () => {
-    setVisibleCount((prevCount) => prevCount + 5);
+    setVisibleCount((prev) => prev + 5);
   };
 
   // Sort venues by count descending (optional, but often makes sense)
@@ -50,62 +43,34 @@ const VenuesCard: React.FC<VenuesCardProps> = ({ venues }) => {
       >
         Venues
       </Typography>
-
-      {sortedVenues.length > 0 ? (
-        <>
-          <Table
-            size="small"
-            aria-label="List of venues with paper counts and CORE ranks"
-            sx={{ "& td, & th": { border: "none", padding: "6px 8px" } }}
-          >
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: "bold" }}>Venue</TableCell>
-                <TableCell align="center" sx={{ fontWeight: "bold" }}>
-                  Count
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                  CORE Rank
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sortedVenues.slice(0, visibleCount).map((venue) => (
-                <TableRow key={venue.name || Math.random()}>
-                  <TableCell sx={{ color: "#333" }}>
-                    {venue.name || "Unknown Venue"}
-                  </TableCell>
-                  <TableCell align="center" sx={{ color: "#555" }}>
-                    {venue.count}
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontStyle: "italic", color: "#555" }}>
-                    {venue.coreRank || "N/A"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {/* Load More Button when more venues exist */}
-          {visibleCount < sortedVenues.length && (
-            <Button
-              variant="contained"
-              onClick={handleLoadMore}
-              sx={{
-                marginTop: 2,
-                textTransform: "none",
-              }}
-              fullWidth
-            >
-              Load More
-            </Button>
-          )}
-        </>
-      ) : (
-        // Graceful message if no venues available
-        <Typography variant="body2" color="textSecondary">
-          No venues available.
-        </Typography>
+      <Table size="small" sx={{ "& td, & th": { border: "none", padding: "4px 8px" } }}>
+        <TableBody>
+          {venues.slice(0, visibleCount).map((venue) => (
+            <TableRow key={venue.name}>
+              <TableCell sx={{ fontWeight: "bold", color: "#333" }}>
+                {venue.name}
+              </TableCell>
+              <TableCell align="center" sx={{ color: "#555" }}>
+                {venue.count}
+              </TableCell>
+              <TableCell align="right" sx={{ fontStyle: "italic", color: "#555" }}>
+                {venue.coreRank ? venue.coreRank : getCoreRanking(venue.name) || "N/A"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {visibleCount < venues.length && (
+        <Button
+          variant="contained"
+          onClick={handleLoadMore}
+          sx={{
+            marginTop: 2,
+            textTransform: "none",
+          }}
+        >
+          Load More
+        </Button>
       )}
     </Box>
   );

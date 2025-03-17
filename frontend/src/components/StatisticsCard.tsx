@@ -1,13 +1,7 @@
 import React from "react";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import InsightsIcon from "@mui/icons-material/Insights"; // Icon for statistics
+import { Box, Typography } from "@mui/material";
 
-interface StatisticsCardProps {
+interface StatisticsProps {
   author: {
     papers?: number;
     citations?: number;
@@ -16,47 +10,23 @@ interface StatisticsCardProps {
   };
 }
 
-const StatisticsCard: React.FC<StatisticsCardProps> = ({ author }) => {
-  const stats = [
-    { label: "Total Papers", value: author.papers ?? "N/A" },
-    { label: "Total Citations", value: author.citations ?? "N/A" },
-    { label: "H-Index", value: author.hIndex ?? "N/A" },
-    { label: "G-Index", value: author.gIndex ?? "N/A" },
-  ];
-
+const StatisticsCard: React.FC<StatisticsProps> = ({ author }) => {
   return (
     <Box
       sx={{
         padding: 3,
         borderRadius: "8px",
-        backgroundColor: "#FFF", // Light background
+        backgroundColor: "#FFFFFF",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
-      <Typography
-        variant="h6"
-        sx={{
-          fontWeight: "bold",
-          marginBottom: 2,
-          color: "#333", // Title color
-        }}
-      >
+      <Typography variant="h6" sx={{ fontWeight: "bold", marginBottom: 2 }}>
         Researcher Statistics
       </Typography>
-      <List>
-        {stats.map((stat, index) => (
-          <ListItem key={index} sx={{ padding: "6px 0" }}>
-            <ListItemIcon>
-              <InsightsIcon sx={{ color: "#1976d2" }} />
-            </ListItemIcon>
-            <ListItemText
-              primary={stat.label}
-              secondary={stat.value.toString()}
-              sx={{ color: "#555" }}
-            />
-          </ListItem>
-        ))}
-      </List>
+      <Typography># Papers: {author?.papers ?? 0}</Typography>
+      <Typography># Citations: {author?.citations ?? 0}</Typography>
+      <Typography>H-Index: {author?.hIndex ?? 0}</Typography>
+      <Typography>G-Index: {author?.gIndex ?? 0}</Typography>
     </Box>
   );
 };

@@ -1,39 +1,46 @@
+// src/react-query/usePublicationDetailsQuery.ts
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
-// Define the response type
+// Define the response types
 interface Author {
   name: string;
-  id?: string; // Optional ID for the author
+  id?: string;
 }
 
-interface PublicationDetails {
+export interface PublicationDetails {
+  title: string;
+  citationCount: number;
   url: string;
   year: number;
   authors: Author[];
   abstract?: string;
   fieldsOfStudy?: string[];
   venue?: string;
+  // You can include additional fields if needed.
 }
 
 // Fetch function for publication details
 const fetchPublicationDetails = async (paperId: string): Promise<PublicationDetails> => {
   const response = await axios.get("http://127.0.0.1:8000/api/paper-details/", {
-    params: { paper_id: paperId }, // Use `paper_id` as the query parameter
+    params: { paper_id: paperId },
   });
 
-  // Map the API response to the desired format
+  // Assume your API returns an object with a "paper" field.
   const paper = response.data?.paper;
   if (!paper) {
     throw new Error("Publication details not found.");
   }
 
   return {
-    url: paper.url || "N/A",
+    title: paper.title || "Untitled",
+    // Use the API's citationCount if available; default to 0 otherwise.
+    citationCount: paper.citationCount !== undefined ? paper.citationCount : 0,
+    url: paper.url && paper.url !== "" ? paper.url : "N/A",
     year: paper.year || 0,
     authors: paper.authors?.map((author: any) => ({
       name: author.name || "Unknown Author",
-      id: author.id, // Include the author ID if available
+      id: author.id,
     })) || [],
     abstract: paper.abstract || "Abstract not available.",
     fieldsOfStudy: paper.fieldsOfStudy || [],
@@ -41,13 +48,12 @@ const fetchPublicationDetails = async (paperId: string): Promise<PublicationDeta
   };
 };
 
-// React Query hook for publication details
 export const usePublicationDetailsQuery = (paperId: string) => {
   return useQuery<PublicationDetails>({
-    queryKey: ["publicationDetails", paperId], // Unique key based on paper ID
-    queryFn: () => fetchPublicationDetails(paperId), // Fetching function
-    enabled: !!paperId, // Ensure the query runs only if `paperId` is provided
-    staleTime: 1000 * 60 * 5, // Cache data for 5 minutes
-    retry: 2, // Retry fetching the data 2 times on failure
+    queryKey: ["publicationDetails", paperId],
+    queryFn: () => fetchPublicationDetails(paperId),
+    enabled: !!paperId, // Run only if paperId is provided
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    retry: 2,
   });
 };

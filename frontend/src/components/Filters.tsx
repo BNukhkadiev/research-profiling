@@ -1,202 +1,202 @@
-import React, { useEffect, useState } from "react";
-import { Box, Button, Chip, Menu, MenuItem } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Menu,
+  MenuItem,
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  SelectChangeEvent,
+} from "@mui/material";
 
-interface FiltersProps {
-  onFilterChange: (filters: any) => void;
-  availableVenues: string[]; // Dynamic venues passed from parent
-  availableYears?: number[]; // Optional, if you want to pass years dynamically
+/** The filter shape */
+export interface FilterState {
+  startYear: number | null;
+  endYear: number | null;
+  venues: string[];
+  coreRanking: string | null;
+  sort: string | null; // "Newest" or "Oldest"
 }
 
-const Filters: React.FC<FiltersProps> = ({ onFilterChange, availableVenues, availableYears }) => {
-  const currentYear = new Date().getFullYear();
-  const earliestYear = 1990;
+/** Props for the Filters component */
+interface FiltersProps {
+  onFilterChange: (filters: FilterState) => void;
+  minYear: number | null;
+  maxYear: number | null;
+  availableVenues: string[];
+}
 
-  const [filters, setFilters] = useState<{
-    yearRange: [number, number] | null;
-    venue: string[];
-    coreRanking: string | null;
-    sort: "asc" | "desc" | null;
-  }>({
-    yearRange: null,
-    venue: [],
+const Filters: React.FC<FiltersProps> = ({
+  onFilterChange,
+  minYear,
+  maxYear,
+  availableVenues,
+}) => {
+  const [filters, setFilters] = useState<FilterState>({
+    startYear: null,
+    endYear: null,
+    venues: [],
     coreRanking: null,
     sort: null,
   });
 
+  const [anchorElDate, setAnchorElDate] = useState<null | HTMLElement>(null);
   const [anchorElVenue, setAnchorElVenue] = useState<null | HTMLElement>(null);
-  const [anchorElCoreRanking, setAnchorElCoreRanking] = useState<null | HTMLElement>(null);
   const [anchorElSort, setAnchorElSort] = useState<null | HTMLElement>(null);
-  const [anchorElYearFrom, setAnchorElYearFrom] = useState<null | HTMLElement>(null);
-  const [anchorElYearTo, setAnchorElYearTo] = useState<null | HTMLElement>(null);
+  const [anchorElCoreRanking, setAnchorElCoreRanking] = useState<null | HTMLElement>(null);
 
-  const years = availableYears || Array.from({ length: currentYear - earliestYear + 1 }, (_, i) => currentYear - i);
+  // Build an array of years from minYear to maxYear
+  const yearOptions: number[] = [];
+  if (minYear !== null && maxYear !== null) {
+    for (let y = minYear; y <= maxYear; y++) {
+      yearOptions.push(y);
+    }
+  }
 
-  // Notify parent when filters update
+  // Notify parent whenever filters change
   useEffect(() => {
     onFilterChange(filters);
   }, [filters, onFilterChange]);
 
-  // Handle adding filters with smart year handling
-  const handleSelectFilter = (type: string, value: any) => {
-    setFilters((prev) => {
-      let updatedYearRange = prev.yearRange;
-
-      if (type === "yearFrom") {
-        const toYear = prev.yearRange?.[1] || currentYear;
-        updatedYearRange = [value, toYear];
-      } else if (type === "yearTo") {
-        const fromYear = prev.yearRange?.[0] || earliestYear;
-        updatedYearRange = [fromYear, value];
-      } else if (type === "venue") {
-        return {
-          ...prev,
-          venue: [...new Set([...prev.venue, value])], // Prevent duplicates
-        };
-      } else if (type === "sort") {
-        return {
-          ...prev,
-          sort: value === "Newest" ? "desc" : "asc",
-        };
-      } else if (type === "coreRanking") {
-        return {
-          ...prev,
-          coreRanking: value,
-        };
-      }
-
-      return { ...prev, yearRange: updatedYearRange };
-    });
+  const handleStartYearChange = (event: SelectChangeEvent<number>) => {
+    const selected = event.target.value as number;
+    setFilters((prev) => ({ ...prev, startYear: selected === 0 ? null : selected }));
   };
 
-  // Handle removing filters
-  const handleRemoveFilter = (type: string, value?: any) => {
-    if (type === "venue") {
+  const handleEndYearChange = (event: SelectChangeEvent<number>) => {
+    const selected = event.target.value as number;
+    setFilters((prev) => ({ ...prev, endYear: selected === 0 ? null : selected }));
+  };
+
+  const handleVenueSelect = (venue: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      venues: [...new Set([...prev.venues, venue])],
+    }));
+    setAnchorElVenue(null);
+  };
+
+  const handleSortSelect = (sortOption: string) => {
+    setFilters((prev) => ({ ...prev, sort: sortOption }));
+    setAnchorElSort(null);
+  };
+
+  const handleCoreRankingSelect = (ranking: string) => {
+    setFilters((prev) => ({ ...prev, coreRanking: ranking }));
+    setAnchorElCoreRanking(null);
+  };
+
+  const handleRemoveFilter = (filterKey: keyof FilterState, value?: string) => {
+    if (filterKey === "venues" && value) {
       setFilters((prev) => ({
         ...prev,
-        venue: prev.venue.filter((v) => v !== value),
+        venues: prev.venues.filter((v) => v !== value),
       }));
     } else {
-      setFilters((prev) => ({
-        ...prev,
-        [type]: null,
-      }));
+      setFilters((prev) => ({ ...prev, [filterKey]: filterKey === "venues" ? [] : null }));
     }
   };
 
-  const handleClearAll = () => {
-    setFilters({
-      yearRange: null,
-      venue: [],
-      coreRanking: null,
-      sort: null,
-    });
-  };
-
   return (
-    <Box>
-      {/* Filter Buttons */}
-      <Box sx={{ display: "flex", gap: 2, marginBottom: 2 }}>
-        <Button variant="outlined" onClick={(e) => setAnchorElYearFrom(e.currentTarget)}>
-          From Year
-        </Button>
-        <Button variant="outlined" onClick={(e) => setAnchorElYearTo(e.currentTarget)}>
-          To Year
-        </Button>
-        <Button variant="outlined" onClick={(e) => setAnchorElVenue(e.currentTarget)}>
-          Venue
-        </Button>
-        <Button variant="outlined" onClick={(e) => setAnchorElCoreRanking(e.currentTarget)}>
-          CORE Ranking
-        </Button>
-        <Button variant="outlined" onClick={(e) => setAnchorElSort(e.currentTarget)}>
-          Sort
-        </Button>
-      </Box>
+    <Box sx={{ marginTop: 2, marginBottom: 2 }}>
+      <Button variant="outlined" onClick={(e) => setAnchorElDate(e.currentTarget)}>
+        Date
+      </Button>
+      <Button variant="outlined" onClick={(e) => setAnchorElVenue(e.currentTarget)}>
+        Venue
+      </Button>
+      <Button variant="outlined" onClick={(e) => setAnchorElSort(e.currentTarget)}>
+        Sort
+      </Button>
+      <Button variant="outlined" onClick={(e) => setAnchorElCoreRanking(e.currentTarget)}>
+        Core Ranking
+      </Button>
 
-      {/* From Year Menu */}
-      <Menu
-        anchorEl={anchorElYearFrom}
-        open={Boolean(anchorElYearFrom)}
-        onClose={() => setAnchorElYearFrom(null)}
-      >
-        {years.map((year) => (
-          <MenuItem key={year} onClick={() => { handleSelectFilter("yearFrom", year); setAnchorElYearFrom(null); }}>
-            {year}
-          </MenuItem>
-        ))}
-      </Menu>
-
-      {/* To Year Menu */}
-      <Menu
-        anchorEl={anchorElYearTo}
-        open={Boolean(anchorElYearTo)}
-        onClose={() => setAnchorElYearTo(null)}
-      >
-        {years.map((year) => (
-          <MenuItem key={year} onClick={() => { handleSelectFilter("yearTo", year); setAnchorElYearTo(null); }}>
-            {year}
-          </MenuItem>
-        ))}
+      {/* Date Menu */}
+      <Menu anchorEl={anchorElDate} open={Boolean(anchorElDate)} onClose={() => setAnchorElDate(null)}>
+        <Box sx={{ padding: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel>Start Year</InputLabel>
+            <Select<number>
+              label="Start Year"
+              value={filters.startYear === null ? 0 : filters.startYear}
+              onChange={handleStartYearChange}
+            >
+              <MenuItem value={0}>(None)</MenuItem>
+              {yearOptions.map((year) => (
+                <MenuItem key={year} value={year}>
+                  {year}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel>End Year</InputLabel>
+            <Select<number>
+              label="End Year"
+              value={filters.endYear === null ? 0 : filters.endYear}
+              onChange={handleEndYearChange}
+            >
+              <MenuItem value={0}>(None)</MenuItem>
+              {yearOptions.map((year) => (
+                <MenuItem key={year} value={year}>
+                  {year}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
       </Menu>
 
       {/* Venue Menu */}
-      <Menu
-        anchorEl={anchorElVenue}
-        open={Boolean(anchorElVenue)}
-        onClose={() => setAnchorElVenue(null)}
-      >
+      <Menu anchorEl={anchorElVenue} open={Boolean(anchorElVenue)} onClose={() => setAnchorElVenue(null)}>
         {availableVenues.map((venue) => (
-          <MenuItem key={venue} onClick={() => { handleSelectFilter("venue", venue); setAnchorElVenue(null); }}>
+          <MenuItem key={venue} onClick={() => handleVenueSelect(venue)}>
             {venue}
           </MenuItem>
         ))}
       </Menu>
 
-      {/* CORE Ranking Menu */}
+      {/* Sort Menu */}
+      <Menu anchorEl={anchorElSort} open={Boolean(anchorElSort)} onClose={() => setAnchorElSort(null)}>
+        {["Newest", "Oldest"].map((sortOption) => (
+          <MenuItem key={sortOption} onClick={() => handleSortSelect(sortOption)}>
+            {sortOption}
+          </MenuItem>
+        ))}
+      </Menu>
+
+      {/* Core Ranking Menu */}
       <Menu
         anchorEl={anchorElCoreRanking}
         open={Boolean(anchorElCoreRanking)}
         onClose={() => setAnchorElCoreRanking(null)}
       >
         {["A*", "A", "B", "C"].map((ranking) => (
-          <MenuItem key={ranking} onClick={() => { handleSelectFilter("coreRanking", ranking); setAnchorElCoreRanking(null); }}>
+          <MenuItem key={ranking} onClick={() => handleCoreRankingSelect(ranking)}>
             {ranking}
           </MenuItem>
         ))}
       </Menu>
 
-      {/* Sort Menu */}
-      <Menu
-        anchorEl={anchorElSort}
-        open={Boolean(anchorElSort)}
-        onClose={() => setAnchorElSort(null)}
-      >
-        {["Newest", "Oldest"].map((option) => (
-          <MenuItem key={option} onClick={() => { handleSelectFilter("sort", option); setAnchorElSort(null); }}>
-            {option}
-          </MenuItem>
-        ))}
-      </Menu>
-
-      {/* Active Filters */}
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", marginBottom: 2 }}>
-        {filters.yearRange && (
-          <Chip
-            label={`Years: ${filters.yearRange[0]} - ${filters.yearRange[1]}`}
-            onDelete={() => handleRemoveFilter("yearRange")}
-          />
+      {/* Active Filters as Chips */}
+      <Box sx={{ marginTop: 2, display: "flex", gap: 1, flexWrap: "wrap" }}>
+        {filters.startYear !== null && (
+          <Chip label={`Start: ${filters.startYear}`} onDelete={() => handleRemoveFilter("startYear")} />
         )}
-        {filters.venue.map((v) => (
-          <Chip key={v} label={`Venue: ${v}`} onDelete={() => handleRemoveFilter("venue", v)} />
+        {filters.endYear !== null && (
+          <Chip label={`End: ${filters.endYear}`} onDelete={() => handleRemoveFilter("endYear")} />
+        )}
+        {filters.venues.map((venue) => (
+          <Chip key={venue} label={`Venue: ${venue}`} onDelete={() => handleRemoveFilter("venues", venue)} />
         ))}
         {filters.coreRanking && (
-          <Chip label={`CORE: ${filters.coreRanking}`} onDelete={() => handleRemoveFilter("coreRanking")} />
+          <Chip label={`Core Ranking: ${filters.coreRanking}`} onDelete={() => handleRemoveFilter("coreRanking")} />
         )}
         {filters.sort && (
-          <Chip label={`Sort: ${filters.sort === "desc" ? "Newest" : "Oldest"}`} onDelete={() => handleRemoveFilter("sort")} />
-        )}
-        {(filters.yearRange || filters.venue.length || filters.coreRanking || filters.sort) && (
-          <Button onClick={handleClearAll} color="secondary">Clear All</Button>
+          <Chip label={`Sort: ${filters.sort}`} onDelete={() => handleRemoveFilter("sort")} />
         )}
       </Box>
     </Box>

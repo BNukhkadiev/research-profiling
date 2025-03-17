@@ -8,9 +8,12 @@ import ListItemText from "@mui/material/ListItemText";
 import TopicIcon from "@mui/icons-material/Topic";
 import Button from "@mui/material/Button";
 
-// Correct interface for topics
+export interface CommonTopicStats {
+  [topic: string]: number;
+}
+
 interface CommonTopicsCardProps {
-  topics: { name: string; count: number }[]; // Array of topics with name and count
+  topics: CommonTopicStats[];
 }
 
 const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
@@ -27,7 +30,7 @@ const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
       sx={{
         padding: 3,
         borderRadius: "8px",
-        backgroundColor: "#FFFFFF", // Light background
+        backgroundColor: "#FFFFFF",
         boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       }}
     >
@@ -36,7 +39,7 @@ const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
         sx={{
           fontWeight: "bold",
           marginBottom: 2,
-          color: "#333", // Darker title color
+          color: "#333",
         }}
       >
         Common Topics

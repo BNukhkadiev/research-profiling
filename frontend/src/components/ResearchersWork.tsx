@@ -2,22 +2,31 @@ import React, { useState } from "react";
 import { Tabs, Tab, Box, Typography } from "@mui/material";
 import PublicationsList from "./PublicationsList";
 
+interface Publication {
+  id: string;
+  url: string;
+  title: string;
+  year: number;
+  venue?: string;
+  authors: { name: string; id?: string }[];
+  citationCount?: number; // Make sure we have a place for citation count
+  topics?: string[];
+  abstract?: string;
+}
+
 interface ResearchersWorkProps {
   author: string;
   authorId: string;
-  publications: {
-    title: string;
-    year: number;
-    type: string;
-    venue: string;
-    citations: number;
-    topics: string[];
-    authors: { name: string; pid: string }[];
-    links: string[];
-  }[];
+  filters: any; // Replace 'any' with your FilterState type if available
+  publications: Publication[];
 }
 
-const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, publications }) => {
+export const ResearchersWork: React.FC<ResearchersWorkProps> = ({
+  author,
+  authorId,
+  filters,
+  publications,
+}) => {
   const [activeTab, setActiveTab] = useState("publications");
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
@@ -52,14 +61,13 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, pub
           boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.1)",
         }}
       >
-        {/* Publications Tab */}
         {activeTab === "publications" && (
           <>
             <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
               Publications by {author}
             </Typography>
             {publications.length > 0 ? (
-              <PublicationsList publications={publications} />
+              <PublicationsList filters={filters} publications={publications} />
             ) : (
               <Typography variant="body2" color="textSecondary">
                 No publications found for {author}.
@@ -68,7 +76,6 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, pub
           </>
         )}
 
-        {/* Repositories Tab */}
         {activeTab === "repositories" && (
           <Box>
             <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
@@ -80,11 +87,10 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, pub
           </Box>
         )}
 
-        {/* Hugging Face Models Tab */}
         {activeTab === "huggingface" && (
           <Box>
             <Typography variant="h6" sx={{ marginBottom: 2, fontWeight: "bold" }}>
-              Models & Datasets by {author}
+              Huggingface by {author}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               This feature is under development.
@@ -95,5 +101,3 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({ author, authorId, pub
     </Box>
   );
 };
-
-export default ResearchersWork;

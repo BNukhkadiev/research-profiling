@@ -1,12 +1,14 @@
+// src/App.tsx
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Header from "./components/Header";
 import HomePage from "./pages/HomePage";
 import SearchResultsPage from "./pages/SearchResultsPage";
-import "./App.css"; // Import the CSS file
 import ResearcherProfilePage from "./pages/ResearcherProfilePage";
 import CompareResearchersPage from "./pages/CompareResearchersPage";
-import PublicationDetailsPage from "./pages/PublicationDetailsPage"; // Import the new page
+import PublicationDetailsPage from "./pages/PublicationDetailsPage";
+import SettingsPage from "./pages/SettingsPage"; 
+import "./App.css";
 
 function App() {
   return (
@@ -27,6 +29,10 @@ function App() {
           path="/publication/:publicationId"
           element={<PublicationDetailsPage />}
         />
+        <Route path="/profile/:pid" element={<ResearcherProfilePage />} />
+        <Route path="/compare-researchers" element={<CompareResearchersPage />} />
+        <Route path="/publication/:publicationId" element={<PublicationDetailsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </Router>
   );
