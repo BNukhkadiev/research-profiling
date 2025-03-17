@@ -10,8 +10,11 @@ from BaseXClient import BaseXClient
 
 logger = logging.getLogger(__name__)
 
-core_data = pd.read_csv(settings.BASE_DIR / 'data' / 'CORE.csv', names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"])
-core_data = core_data[['name', 'abbreviation', 'rank']]
+# Load CORE data
+core_data = pd.read_csv(
+    settings.BASE_DIR / 'data' / 'CORE.csv',
+    names=["id", "name", "abbreviation", "source", "rank", "6", "7", "8", "9"]
+)[['name', 'abbreviation', 'rank']]
 
 
 class ProfileFetcher:
@@ -24,20 +27,58 @@ class ProfileFetcher:
     def fetch_profile(self):
         author = Author.objects(name=self.author_name).first()
 
+        # ✅ CASE 1: Already cached with publications
         if author and author.publications:
             logger.info(f"Author '{author.name}' found in MongoDB with cached publications.")
             return self._author_to_dict(author)
 
-        logger.info(f"Fetching from BaseX for author '{self.author_name}'")
+        logger.info(f"Fetching BaseX for author '{self.author_name}'")
+
+        # ✅ Fetch from BaseX
         self.fetch_data_from_basex()
         affiliations = self._get_author_affiliations(self.author_name)
         publications, coauthors_dict, topic_counts = self.parse_publications()
-        result = self.compile_results(
-            self.author_name, affiliations, publications, coauthors_dict, topic_counts
-        )
 
-        return result 
+        # ✅ CASE 2: Exists but missing publications -> update
+        if author and not author.publications:
+            logger.info(f"Updating existing author '{self.author_name}' with new publications.")
+            author.affiliations = affiliations
+            author.publications = self._build_publications_for_db(publications)
+            author.save()
+            return self._author_to_dict(author)
 
+        # ✅ CASE 3: New author -> insert
+        if not author:
+            logger.info(f"Saving new author '{self.author_name}' to MongoDB.")
+            author_doc = Author(
+                name=self.author_name,
+                affiliations=affiliations,
+                description="",  # Placeholder
+                publications=self._build_publications_for_db(publications)
+            )
+            author_doc.save()
+
+        # ✅ Return compiled result
+        return self.compile_results(self.author_name, affiliations, publications, coauthors_dict, topic_counts)
+
+    def _build_publications_for_db(self, publications):
+        """Convert parsed dict to Publication objects for DB."""
+        publication_docs = []
+        for pub in publications:
+            pub_doc = Publication(
+                title=pub["title"],
+                topics=pub["topics"],
+                abstract=pub["abstract"],
+                core_rank=pub["core_rank"],
+                citations=pub["citations"],
+                coauthors=[CoAuthor(name=a["name"]) for a in pub["authors"] if a["name"] != self.author_name],
+                links=pub["links"],
+                year=pub['year'],
+                venue=pub["venue"],
+                is_preprint=pub["is_preprint"]
+            )
+            publication_docs.append(pub_doc)
+        return publication_docs
 
     def fetch_data_from_basex(self):
         session = BaseXClient.Session('localhost', 1984, 'admin', 'admin')
@@ -55,7 +96,6 @@ class ProfileFetcher:
             query.close()
         finally:
             session.close()
-    
 
     def parse_publications(self):
         publications, coauthors_dict, topic_counts = [], defaultdict(int), Counter()
@@ -67,19 +107,14 @@ class ProfileFetcher:
 
         return publications, coauthors_dict, topic_counts
 
-
     def _parse_single_publication(self, publ_info, coauthors_dict, topic_counts):
         title = publ_info.findtext("title", "").strip()
         year = int(publ_info.findtext("year", "0") or 0)
-
-        # Get venue based on type
         venue = self._get_venue(publ_info)
         core_rank = fuzzy_match(self.core_data, venue, 'name', 'abbreviation') or "Unknown"
-
-        # Detect preprint based on publtype="informal"
         is_preprint = publ_info.attrib.get("publtype") == "informal"
 
-        # Authors
+        # Coauthors and authors
         authors = []
         for author in publ_info.findall("author"):
             author_name = author.text.strip()
@@ -87,10 +122,8 @@ class ProfileFetcher:
             if author_name != self.author_name:
                 coauthors_dict[author_name] += 1
 
-        # Links
+        # Links and topics
         links = [ee.text.strip() for ee in publ_info.findall("ee")]
-
-        # Extract topics
         raw_topics = self.extractor.extract_keywords(doc=title)
         topics = [topic[0] for topic in raw_topics]
         topic_counts.update(topics)
@@ -98,17 +131,16 @@ class ProfileFetcher:
         return {
             "title": title,
             "year": year,
-            "venue": venue,  # Only venue name
+            "venue": venue,
             "core_rank": core_rank,
-            "citations": 0,  # Placeholder
+            "citations": 0,
             "topics": topics,
-            "authors": authors,
+            "coauthors": authors,
             "links": links,
-            "abstract": "",  # Placeholder
-            "preprint": is_preprint  # Preprint flag based on publtype
+            "abstract": "",
+            "is_preprint": is_preprint
         }
-    
-    
+
     def compile_results(self, name, affiliations, publications, coauthors_dict, topic_counts):
         topics_list = [{topic: count} for topic, count in topic_counts.most_common()]
         coauthors_list = sorted(
@@ -119,19 +151,16 @@ class ProfileFetcher:
         return {
             "name": name,
             "affiliations": affiliations,
-            "h-index": 3,  # Placeholder
-            "g-index": 2,  # Placeholder
+            "h-index": -1,
+            "g-index": -1,
             "total_papers": len(publications),
-            "total_citations": 1000,  # Placeholder
-            "papers": publications,
+            "total_citations": -1,
+            "publications": publications,
             "topics": topics_list,
             "coauthors": coauthors_list
         }
 
     def _get_venue(self, publ_info):
-        """
-        Get only the venue name from the publication.
-        """
         if publ_info.tag == "inproceedings":
             return publ_info.findtext("booktitle", "Unknown Conference")
         elif publ_info.tag == "article":
@@ -148,15 +177,11 @@ class ProfileFetcher:
             return publ_info.findtext("publisher", "Unknown Dataset Publisher")
         return "Unknown"
 
-
     def _get_author_affiliations(self, author_name):
-        """Fetch unique affiliations for a given author and return them as a plain string list."""
         session = BaseXClient.Session('localhost', 1984, 'admin', 'admin')
         affiliations = []
-        
         try:
-            session.execute("OPEN dblp")  # Open the correct DB
-            
+            session.execute("OPEN dblp")
             query_text = f"""
             let $author_name := '{author_name}'
             for $aff in distinct-values(
@@ -164,18 +189,36 @@ class ProfileFetcher:
             )
             return <affiliation>{{$aff}}</affiliation>
             """
-            
             query = session.query(query_text)
-            
-            # Add detailed debugging
-            for typecode, item in query.iter():
+            for _, item in query.iter():
                 try:
                     elem = ET.fromstring(item)
-                    affiliations.append(elem.text.strip())                
+                    affiliations.append(elem.text.strip())
                 except ET.ParseError as e:
-                    print("Parse error:", e, "on item:", item)
-            
+                    logger.warning(f"Parse error: {e} on item: {item}")
             query.close()
             return affiliations
         finally:
             session.close()
+
+    def _author_to_dict(self, author):
+        return {
+            "name": author.name,
+            "affiliations": author.affiliations,
+            "description": author.description,
+            "publications": [
+                {
+                    "title": pub.title,
+                    "topics": pub.topics,
+                    "abstract": pub.abstract,
+                    "venue": pub.venue,
+                    "core_rank": pub.core_rank,
+                    "citations": pub.citations,
+                    "coauthors": [co.name for co in pub.coauthors],
+                    "links": pub.links,
+                    "year": pub.year,
+                    "is_preprint": pub.is_preprint
+                }
+                for pub in author.publications
+            ]
+        }

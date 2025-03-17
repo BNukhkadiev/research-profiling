@@ -322,11 +322,14 @@ class GitHubProfileView(APIView):
         return Response({"github_url": github_url}, status=status.HTTP_200_OK)
     
 
+
+# Global comparison list to store researcher names
 comparison_list = set()
+
 class CompareResearchersView(APIView):
     permission_classes = [AllowAny]
     """
-    Manages the list of researchers in comparison.
+    Manages the list of researchers in comparison, based on names.
     """
 
     def get(self, request):
@@ -338,68 +341,92 @@ class CompareResearchersView(APIView):
     def post(self, request):
         """
         Add a researcher to the comparison list.
-        If the researcher is not found in MongoDB, fetch it from DBLP and store it.
+        If not found in MongoDB, fetch and store. If found without publications, update.
         """
-        pid = request.data.get("pid", "").strip()
-        if not pid:
-            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        name = request.data.get("name", "").strip()
+        if not name:
+            return Response({"error": "name parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # If already in the list, return success
-        if pid in comparison_list:
+        # If already in comparison list
+        if name in comparison_list:
             return Response({"message": "Researcher already in comparison list."}, status=status.HTTP_200_OK)
 
-        # Check if researcher exists in MongoDB
-        author = Author.objects(pid=pid).first()
-        if not author:
-            try:
-                logger.info(f"Fetching new researcher data for {pid}")
-                fetcher = ProfileFetcher(pid, extractor=KeywordExtractor())
-                profile_data = fetcher.fetch_profile()
+        try:
+            # Check if author exists (case-insensitive)
+            author = Author.objects(name__iexact=name).first()
 
-                # Store new author in MongoDB
+            if author and author.publications:
+                # Add to comparison list and return existing data
+                comparison_list.add(author.name)  # Use exact name from DB
+                return Response({"message": "Researcher added to comparison list."}, status=status.HTTP_200_OK)
+
+            # If author doesn't exist OR has no publications -> fetch
+            logger.info(f"Fetching researcher data for {name}")
+            fetcher = ProfileFetcher(author_name=name, extractor=KeywordExtractor())
+            profile_data = fetcher.fetch_profile()
+
+            # Check if author now exists in DB (race condition handling)
+            author = Author.objects(name__iexact=name).first()
+            if author:
+                # Case: Exists but no publications, update
+                if not author.publications:
+                    logger.info(f"Updating existing author '{name}' with fetched publications.")
+                    author.affiliations = profile_data["affiliations"]
+                    author.publications = fetcher._build_publications_for_db(profile_data["publications"])
+                    author.save()
+            else:
+                # Case: Fully new author, save
+                logger.info(f"Saving new author '{name}' to MongoDB.")
                 new_author = Author(
-                    pid=profile_data["pid"],
                     name=profile_data["name"],
                     affiliations=profile_data["affiliations"],
-                    dblp_url=profile_data.get("dblp_url", ""),
                     description=profile_data.get("description", ""),
-                    publications=[
-                        {
-                            "title": pub["title"],
-                            "year": pub["year"],
-                            "paper_type": pub["type"],
-                            "venue": pub["venue"],
-                            "citations": pub["citations"],
-                            "topics": pub["topics"],
-                            "links": pub["links"],
-                            "coauthors": [a["name"] for a in pub["authors"] if a["name"] != profile_data["name"]]
-                        } for pub in profile_data.get("papers", [])
-                    ]
+                    publications=fetcher._build_publications_for_db(profile_data["publications"])
                 )
                 new_author.save()
 
-                # Add to comparison list
-                comparison_list.add(pid)
+            # Add to comparison list
+            comparison_list.add(profile_data["name"])  # Use properly cased name
 
-                return Response({"message": "Researcher added to comparison list.", "profile": profile_data}, status=status.HTTP_201_CREATED)
-            except Exception as e:
-                logger.error(f"Failed to fetch researcher {pid}: {e}")
-                return Response({"error": "Failed to fetch researcher data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"message": "Researcher added to comparison list.", "profile": profile_data}, status=status.HTTP_201_CREATED)
 
-        # Add researcher to comparison list if already exists in MongoDB
-        comparison_list.add(pid)
-        return Response({"message": "Researcher added to comparison list."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Failed to fetch and save researcher '{name}': {e}")
+            return Response({"error": "Failed to fetch and save researcher data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     def delete(self, request):
         """
         Remove a researcher from the comparison list.
+        Accepts name as a query parameter: ?name=Researcher%20Name
         """
-        pid = request.data.get("pid", "").strip()
-        if not pid:
-            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        name = request.query_params.get("name", "").strip()  # ✅ Get from query params (fixing frontend issue)
 
-        if pid in comparison_list:
-            comparison_list.remove(pid)
-            return Response({"message": f"Removed researcher {pid} from comparison list."}, status=status.HTTP_200_OK)
+        if not name:
+            return Response({"error": "name parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # ✅ Optionally use cache (uncomment if using Django cache)
+        # comparison_list = cache.get('comparison_list', set())
+        global comparison_list  # Using global for now, you can replace this with cache as needed
+
+        # Case 1: Researcher is in comparison list, remove
+        if name in comparison_list:
+            comparison_list.remove(name)
+            # cache.set('comparison_list', comparison_list)  # Uncomment if using cache
+            return Response({"message": f"Removed researcher '{name}' from comparison list."}, status=status.HTTP_200_OK)
+
+        # Case 2: Researcher not found
         return Response({"error": "Researcher not found in comparison list."}, status=status.HTTP_404_NOT_FOUND)
+   
+   
+    @staticmethod
+    def _author_to_dict(author):
+        """
+        Utility to convert Author Mongo object to dict for JSON response.
+        """
+        return {
+            "name": author.name,
+            "affiliations": author.affiliations,
+            "description": author.description,
+            "publications": [pub.to_mongo() for pub in author.publications]  # Convert publications for response
+        }

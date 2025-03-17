@@ -1,6 +1,6 @@
 from django.db import models
 from mongoengine import (
-    Document, StringField, ListField, DateTimeField,
+    Document, StringField, ListField, DateTimeField, BooleanField,
     EmbeddedDocument, EmbeddedDocumentListField, IntField, URLField
 )
 import datetime
@@ -18,9 +18,14 @@ class Publication(EmbeddedDocument):
     title = StringField(required=True)  # Still useful to map/enrich correct paper
     topics = ListField(StringField())  # LLM-generated topics
     abstract = StringField()  # Retrieved/generated abstract
+    venue = StringField()
     core_rank = StringField(default="Unknown")  # CORE ranking if added
     citations = IntField(default=0)  # From external citation count sources
     coauthors = EmbeddedDocumentListField(CoAuthor)  # Names only
+    links = ListField(StringField())
+    year = IntField(default=0)
+    is_preprint = BooleanField(default="false")  # Flag to mark preprints
+
 
 
 class Author(Document):
@@ -29,7 +34,7 @@ class Author(Document):
     """
     name = StringField(required=True, unique=True)  # Author name as unique identifier
     description = StringField()  # LLM-generated summary of author
-
+    affiliations = ListField(StringField())
     # Enriched publication data embedded directly under author
     publications = EmbeddedDocumentListField(Publication)
 
