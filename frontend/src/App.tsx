@@ -9,6 +9,9 @@ import CompareResearchersPage from "./pages/CompareResearchersPage";
 import PublicationDetailsPage from "./pages/PublicationDetailsPage";
 import SettingsPage from "./pages/SettingsPage"; 
 import "./App.css";
+import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
+import LogoutPage from "./pages/LogoutPage";
 
 function App() {
   return (
@@ -33,6 +36,9 @@ function App() {
         <Route path="/compare-researchers" element={<CompareResearchersPage />} />
         <Route path="/publication/:publicationId" element={<PublicationDetailsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/logout" element={<LogoutPage />} />
       </Routes>
     </Router>
   );

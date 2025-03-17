@@ -1,7 +1,8 @@
 from django.urls import path, re_path
 from .views import  CompareResearchersView, PublicationSearchView, PaperDetailsView
 from .views import SearchView, ResearcherProfileView, UpdateCitationsView
-
+from .views import LoginView
+from .views import SignupView
 
 urlpatterns = [
     path('sem-scholar-publication-search/', PublicationSearchView.as_view(), name='sem-scholar-publication-search'),
@@ -10,6 +11,8 @@ urlpatterns = [
     path('researcher-profile/', ResearcherProfileView.as_view(), name='researcher-profile'),
     path('compare-researchers/', CompareResearchersView.as_view(), name='compare-researchers'),  #  ADD THIS!
     path('update-citations/', UpdateCitationsView.as_view(), name='update-citations'),  #  ADD THIS!
+    path('login/', LoginView.as_view(), name="login"),
+    path("signup/", SignupView.as_view(), name="signup"),
     
 ]
 
