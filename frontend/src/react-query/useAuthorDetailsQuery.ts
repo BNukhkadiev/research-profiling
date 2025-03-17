@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
-// Define the response structure for a researcher's profile
+// Final structure of response including venues generated from papers
 export interface ResearcherProfileResponse {
   name: string;
   affiliations: string[];
@@ -9,39 +9,30 @@ export interface ResearcherProfileResponse {
   gIndex: number;
   totalPapers: number;
   totalCitations: number;
-  venues: { name: string; count: number; coreRank: string }[];
   topics: { name: string; count: number }[];
+  venues: { name: string; count: number; coreRank: string }[];
   papers: {
     title: string;
     year: number;
     venue: string;
-    coreRank: string; // ✅ Added coreRank as part of paper
+    coreRank: string;
     citations: number;
     topics: string[];
-    authors: { name: string }[]; // Only name now
+    authors: { name: string }[];
     links: string[];
-    abstract: string; // Placeholder or filled
-    preprint: boolean; // Added for preprint flag
+    abstract: string;
+    preprint: boolean;
   }[];
   coauthors: { name: string; publicationsTogether: number }[];
 }
 
-// Fetch function for researcher profile
+// Fetch function
 const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileResponse> => {
   const encodedName = encodeURIComponent(name);
 
   try {
     const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?author_name=${encodedName}`);
     const data = response.data;
-
-    // ✅ Direct mapping of venues (if backend sends it as [{name, count, core_rank}])
-    const venues = Array.isArray(data.venues)
-      ? data.venues.map((venue: any) => ({
-          name: venue.name,
-          count: venue.count,
-          coreRank: venue.core_rank,
-        }))
-      : [];
 
     // ✅ Transform topics
     const topics = Array.isArray(data.topics)
@@ -60,31 +51,47 @@ const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileRe
         }))
       : [];
 
-    // ✅ Transform papers with venue and coreRank
-    const papers = Array.isArray(data.papers)
-      ? data.papers.map((paper: any) => ({
+    // ✅ Transform papers (from backend "publications")
+    const papers = Array.isArray(data.publications)
+      ? data.publications.map((paper: any) => ({
           title: paper.title,
           year: paper.year,
-          venue: paper.venue,
-          coreRank: paper.core_rank, // ✅ Correctly included
-          citations: paper.citations,
-          topics: paper.topics,
-          authors: paper.authors.map((author: any) => ({ name: author.name })),
-          links: paper.links,
-          abstract: paper.abstract,
-          preprint: paper.preprint,
+          venue: paper.venue || "Unknown Venue",
+          coreRank: paper.core_rank || "Unknown",
+          citations: paper.citations || 0,
+          topics: paper.topics || [],
+          authors: (paper.coauthors || []).map((author: any) => ({ name: author })),
+          links: paper.links || [],
+          abstract: paper.abstract || "",
+          preprint: paper.preprint || false,
         }))
       : [];
 
+    // ✅ Dynamically generate venues from papers
+    const venueMap: Record<string, { count: number; coreRank: string }> = {};
+    for (const paper of papers) {
+      if (paper.venue) {
+        if (!venueMap[paper.venue]) {
+          venueMap[paper.venue] = { count: 0, coreRank: paper.coreRank };
+        }
+        venueMap[paper.venue].count += 1;
+      }
+    }
+    const venues = Object.entries(venueMap).map(([name, data]) => ({
+      name,
+      count: data.count,
+      coreRank: data.coreRank,
+    }));
+
     return {
       name: data.name,
-      affiliations: data.affiliations,
-      hIndex: data['h-index'],
-      gIndex: data['g-index'],
-      totalPapers: data.total_papers,
-      totalCitations: data.total_citations,
-      venues,
+      affiliations: data.affiliations || [],
+      hIndex: data.h_index ?? -1,
+      gIndex: data.g_index ?? -1,
+      totalPapers: data.total_papers ?? papers.length,
+      totalCitations: data.total_citations ?? 0,
       topics,
+      venues,
       papers,
       coauthors,
     };
@@ -94,13 +101,13 @@ const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileRe
   }
 };
 
-// React Query hook for researcher profile
+// ✅ React Query hook
 export const useResearcherProfileQuery = (name: string) => {
   return useQuery<ResearcherProfileResponse>({
     queryKey: ["researcherProfile", name],
     queryFn: () => fetchResearcherProfile(name),
-    enabled: Boolean(name), // Only fetch if name is provided
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: 2, // Retry twice on failure
+    enabled: Boolean(name),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2,
   });
 };

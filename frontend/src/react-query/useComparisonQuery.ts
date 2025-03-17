@@ -1,39 +1,44 @@
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import axios from "axios";
 
-// ✅ Fetch comparison list (only PIDs)
+/**
+ * ✅ Fetch list of researcher names added to comparison.
+ */
 export const useComparisonResearchers = () => {
   const queryClient = useQueryClient();
 
+  // Step 1: Fetch names from backend comparison list
   const {
     data: comparisonList = [],
     isLoading: isLoadingList,
     refetch,
-  } = useQuery({
+  } = useQuery<string[]>({
     queryKey: ["comparisonResearchers"],
     queryFn: async () => {
       const { data } = await axios.get("http://127.0.0.1:8000/api/compare-researchers/");
       return data.comparison_list || [];
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 5, // 5 minutes caching
   });
 
-  // ✅ Use `useQueries` to fetch researcher profiles
+  // Step 2: Fetch each researcher's full profile using names
   const researcherQueries = useQueries({
-    queries: comparisonList.map((pid) => ({
-      queryKey: ["researcherProfile", pid],
+    queries: comparisonList.map((name) => ({
+      queryKey: ["researcherProfile", name],
       queryFn: async () => {
-        const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?pid=${encodeURIComponent(pid)}`);
+        const response = await axios.get(
+          `http://127.0.0.1:8000/api/researcher-profile/?author_name=${name}`
+        );
         return response.data;
       },
-      enabled: !!pid, // Ensures we only fetch when pid exists
+      enabled: !!name, // Only if name is non-empty
       staleTime: 1000 * 60 * 5,
     })),
   });
 
-  // ✅ Transform researcher data
+  // Step 3: Map results for easier consumption
   const researchers = researcherQueries.map(({ data, isLoading, isError }, index) => ({
-    pid: comparisonList[index],
+    name: comparisonList[index], // Include name for UI
     data,
     isLoading,
     isError,
@@ -42,31 +47,36 @@ export const useComparisonResearchers = () => {
   return { researchers, comparisonList, isLoading: isLoadingList, refetch };
 };
 
-// ✅ Add researcher to comparison (Immediate UI Update)
+/**
+ * ✅ Add researcher to comparison list (by name) with optimistic UI update
+ */
+
 export const useAddResearcher = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (pid: string) => {
-      await axios.post("http://127.0.0.1:8000/api/compare-researchers/", { pid });
+    mutationFn: async (name: string) => {
+      await axios.post("http://127.0.0.1:8000/api/compare-researchers/", { name });
     },
-    onSuccess: (_, pid) => {
+    onSuccess: (_, name) => {
       queryClient.setQueryData(["comparisonResearchers"], (oldData: string[] | undefined) => {
-        return oldData ? [...oldData, pid] : [pid];
+        return oldData && !oldData.includes(name) ? [...oldData, name] : oldData || [name];
       });
     },
   });
 };
 
-// ✅ Remove researcher from comparison (Immediate UI Update)
+/**
+ * ✅ Remove researcher from comparison list (by name) with optimistic UI update
+ */
 export const useRemoveResearcher = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (pid: string) => {
-      await axios.delete("http://127.0.0.1:8000/api/compare-researchers/", { data: { pid } });
+    mutationFn: async (name: string) => {
+      await axios.delete(`http://127.0.0.1:8000/api/compare-researchers/?name=${encodeURIComponent(name)}`);
     },
-    onSuccess: (_, pid) => {
+    onSuccess: (_, name) => {
       queryClient.setQueryData(["comparisonResearchers"], (oldData: string[] | undefined) => {
-        return oldData ? oldData.filter((id) => id !== pid) : [];
+        return oldData ? oldData.filter((n) => n !== name) : [];
       });
     },
   });

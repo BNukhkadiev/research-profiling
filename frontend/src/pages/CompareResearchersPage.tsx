@@ -3,11 +3,10 @@ import {
   Box,
   Typography,
   Grid,
-  Button,
   CircularProgress,
   IconButton,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close"; // ✅ Import Close (X) icon
+import CloseIcon from "@mui/icons-material/Close";
 import {
   useComparisonResearchers,
   useRemoveResearcher,
@@ -15,12 +14,13 @@ import {
 import PublicationsLineChart from "../components/PublicationsLineChart";
 import CoreRankingBarChart from "../components/CoreRankingBarChart";
 import ResearchAreasPieChart from "../components/ResearchAreasPieChart";
+import WordCloudChart from "../components/WordCloudChart";
 
 const CompareResearchersPage = () => {
   const { researchers, isLoading } = useComparisonResearchers();
   const removeResearcherMutation = useRemoveResearcher();
 
-  console.log(" Researchers List:", researchers); //  Debugging researchers list
+  console.log("Researchers List:", researchers);
 
   if (isLoading) {
     return (
@@ -38,7 +38,11 @@ const CompareResearchersPage = () => {
   }
 
   if (!researchers || researchers.length === 0) {
-    return <Typography>No researchers selected for comparison.</Typography>;
+    return (
+      <Typography variant="h6" sx={{ textAlign: "center", marginTop: 4 }}>
+        No researchers selected for comparison.
+      </Typography>
+    );
   }
 
   return (
@@ -49,35 +53,35 @@ const CompareResearchersPage = () => {
 
       {/* Researcher Info Cards */}
       <Grid container spacing={2}>
-        {researchers.map(({ pid, data, isLoading, isError }) => (
-          <Grid item xs={12} sm={6} md={4} key={pid}>
+        {researchers.map(({ name, data, isLoading, isError }) => (
+          <Grid item xs={12} sm={6} md={4} key={name}>
             <Box
               sx={{
-                position: "relative", // ✅ Enable absolute positioning for the X button
+                position: "relative",
                 padding: 2,
                 backgroundColor: "#fff",
                 borderRadius: 2,
                 boxShadow: 2,
               }}
             >
-              {/* Small "X" button on top-right */}
               <IconButton
-                onClick={() => removeResearcherMutation.mutate(pid)}
+                onClick={() => removeResearcherMutation.mutate(name)}
                 sx={{
                   position: "absolute",
                   top: 4,
                   right: 4,
                   color: "gray",
-                  "&:hover": { color: "black" }, // Make it darker on hover
+                  "&:hover": { color: "black" },
                 }}
               >
                 <CloseIcon fontSize="small" />
               </IconButton>
+
               {isLoading ? (
                 <CircularProgress />
               ) : isError || !data ? (
                 <Typography color="error">
-                  Failed to load researcher {pid}
+                  Failed to load researcher {name}
                 </Typography>
               ) : (
                 <>
@@ -98,8 +102,7 @@ const CompareResearchersPage = () => {
                     <strong>Total Papers:</strong> {data.totalPapers ?? "N/A"}
                   </Typography>
                   <Typography variant="body1">
-                    <strong>Total Citations:</strong>{" "}
-                    {data.totalCitations ?? "N/A"}
+                    <strong>Total Citations:</strong> {data.totalCitations ?? "N/A"}
                   </Typography>
                 </>
               )}
@@ -108,15 +111,16 @@ const CompareResearchersPage = () => {
         ))}
       </Grid>
 
-      {/* Charts for comparison */}
+      {/* Charts for Comparison */}
       {researchers.length > 0 && (
         <>
+          {/* Line and Bar Charts */}
           <Grid container spacing={2} sx={{ marginTop: 4 }}>
             <Grid item xs={12} md={6}>
               <PublicationsLineChart
                 researchers={researchers.map(({ data }) => ({
                   name: data?.name || "Unknown",
-                  papers: data?.papers || [],
+                  papers: data?.publications || [],
                 }))}
               />
             </Grid>
@@ -124,20 +128,44 @@ const CompareResearchersPage = () => {
               <CoreRankingBarChart
                 researchers={researchers.map(({ data }) => ({
                   name: data?.name || "Unknown",
-                  papers: data?.papers || [], // Send `papers` instead of `venues`
+                  papers: data?.publications || [],
                 }))}
               />
             </Grid>
           </Grid>
 
+          {/* Pie Chart */}
           <Box sx={{ marginTop: 4 }}>
             <ResearchAreasPieChart
               researchers={researchers.map(({ data }) => ({
                 name: data?.name || "Unknown",
-                papers: data?.papers || [], // ✅ Ensure `papers` is always an array
+                papers: data?.publications || [],
               }))}
             />
           </Box>
+
+          {/* Word Clouds */}
+          <Grid container spacing={4} sx={{ marginTop: 4 }}>
+            {researchers.map(({ data }) => (
+              <Grid item xs={12} sm={6} md={4} key={data?.name || Math.random()}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    marginBottom: 1,
+                  }}
+                >
+                  {data?.name || "Unknown"}'s Word Cloud
+                </Typography>
+                <WordCloudChart
+                  topics={
+                    data?.publications?.flatMap((p) => p.topics) || []
+                  }
+                />
+              </Grid>
+            ))}
+          </Grid>
         </>
       )}
     </Box>

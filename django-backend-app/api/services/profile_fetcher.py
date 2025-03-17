@@ -27,19 +27,19 @@ class ProfileFetcher:
     def fetch_profile(self):
         author = Author.objects(name=self.author_name).first()
 
-        # ✅ CASE 1: Already cached with publications
+        # CASE 1: Already cached with publications
         if author and author.publications:
             logger.info(f"Author '{author.name}' found in MongoDB with cached publications.")
             return self._author_to_dict(author)
 
         logger.info(f"Fetching BaseX for author '{self.author_name}'")
 
-        # ✅ Fetch from BaseX
+        # Fetch from BaseX
         self.fetch_data_from_basex()
         affiliations = self._get_author_affiliations(self.author_name)
         publications, coauthors_dict, topic_counts = self.parse_publications()
 
-        # ✅ CASE 2: Exists but missing publications -> update
+        # CASE 2: Exists but missing publications -> update
         if author and not author.publications:
             logger.info(f"Updating existing author '{self.author_name}' with new publications.")
             author.affiliations = affiliations
@@ -47,7 +47,7 @@ class ProfileFetcher:
             author.save()
             return self._author_to_dict(author)
 
-        # ✅ CASE 3: New author -> insert
+        # CASE 3: New author -> insert
         if not author:
             logger.info(f"Saving new author '{self.author_name}' to MongoDB.")
             author_doc = Author(
@@ -58,7 +58,7 @@ class ProfileFetcher:
             )
             author_doc.save()
 
-        # ✅ Return compiled result
+        # Return compiled result
         return self.compile_results(self.author_name, affiliations, publications, coauthors_dict, topic_counts)
 
     def _build_publications_for_db(self, publications):
@@ -71,7 +71,7 @@ class ProfileFetcher:
                 abstract=pub["abstract"],
                 core_rank=pub["core_rank"],
                 citations=pub["citations"],
-                coauthors=[CoAuthor(name=a["name"]) for a in pub["authors"] if a["name"] != self.author_name],
+                coauthors=[CoAuthor(name=a["name"]) for a in pub["coauthors"] if a["name"] != self.author_name],
                 links=pub["links"],
                 year=pub['year'],
                 venue=pub["venue"],
@@ -103,13 +103,18 @@ class ProfileFetcher:
         for pub_xml in self.publications_xml:
             elem = ET.fromstring(pub_xml)
             pub_data = self._parse_single_publication(elem, coauthors_dict, topic_counts)
-            publications.append(pub_data)
+            if pub_data:
+                publications.append(pub_data)
 
         return publications, coauthors_dict, topic_counts
 
     def _parse_single_publication(self, publ_info, coauthors_dict, topic_counts):
         title = publ_info.findtext("title", "").strip()
         year = int(publ_info.findtext("year", "0") or 0)
+        if title.lower() == "home page" or year == 0:
+            logger.info(f"Skipping invalid publication: '{title}' with year: {year}")
+            return None  # Skip this entry
+        
         venue = self._get_venue(publ_info)
         core_rank = fuzzy_match(self.core_data, venue, 'name', 'abbreviation') or "Unknown"
         is_preprint = publ_info.attrib.get("publtype") == "informal"
