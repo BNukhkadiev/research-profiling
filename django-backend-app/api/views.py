@@ -186,61 +186,67 @@ class ResearcherProfileView(APIView):
 
 
 
-class UpdateCitationsView(APIView):
+class OpenAlexView(APIView):
+    """
+    API endpoint to fetch abstracts and citation counts from OpenAlex for given DOIs
+    and save them into corresponding MongoDB Publication entries.
+    """
     permission_classes = [AllowAny]
-
     def post(self, request):
-        pid = request.data.get("pid", "").strip()
+        dois = request.data.get("dois", [])
+        if not dois or not isinstance(dois, list):
+            return Response({"error": "A list of DOIs must be provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not pid:
-            logger.warning("No PID provided in request")
-            return Response({"error": "pid parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        # Filter DOIs that actually need fetching (missing abstracts)
+        dois_to_fetch = []
+        for doi in dois:
+            found = False
+            authors = Author.objects(publications__links__contains=doi)
+            for author in authors:
+                for publication in author.publications:
+                    if doi in publication.links and publication.abstract:
+                        found = True
+                        break  # Found abstract, skip
+                if found:
+                    break
+            if not found:
+                dois_to_fetch.append(doi)
 
-        logger.info(f"Updating citations and abstracts for PID: {pid}")
+        if not dois_to_fetch:
+            return Response({"message": "All DOIs already have abstracts. No update needed."}, status=status.HTTP_200_OK)
 
-        try:
-            author = Author.objects(pid=pid).first()
-            if not author:
-                logger.warning(f"Author with PID {pid} not found in MongoDB.")
-                return Response({"error": "Author not found."}, status=status.HTTP_404_NOT_FOUND)
+        # Fetch from OpenAlex for those without abstract
+        fetched_data = asyncio.run(OpenAlexFetcher.fetch_openalex_data(dois_to_fetch))
 
-            # Collect all DOIs from publications
-            all_dois = []
-            for pub in author.publications:
-                all_dois.extend(OpenAlexFetcher.extract_dois(pub.links))
-            unique_dois = list(set(all_dois))
+        updated_count = 0
 
-            if not unique_dois:
-                logger.info(f"No DOIs found for author {pid}")
-                return Response({"message": "No DOIs found to update."}, status=status.HTTP_200_OK)
+        # Update publications in MongoDB
+        for doi, data in fetched_data.items():
+            if not data:
+                continue
 
-            # Fetch OpenAlex data for all DOIs
-            openalex_data = asyncio.run(OpenAlexFetcher.fetch_openalex_data(unique_dois))
-            
-            # Rebuild the publications list with updated data
-            updated_publications = []
-            for pub in author.publications:
-                # pub_dois = OpenAlexFetcher.extract_dois(pub.links)
-                pub_dois = pub.links
-                main_doi = pub_dois[0] if pub_dois else None
-                if main_doi and main_doi in openalex_data:
-                    data = openalex_data[main_doi]
-                    pub.citations = data.get("cited_by_count", 0)
-                    pub.abstract = data.get("abstract", "")
+            authors = Author.objects(publications__links__contains=doi)
+            for author in authors:
+                updated = False
+                for publication in author.publications:
+                    if doi in publication.links:
+                        # Update citations
+                        if data.get("cited_by_count") is not None:
+                            publication.citations = data["cited_by_count"]
+                        # Update abstract only if empty
+                        if not publication.abstract and data.get("abstract") is not None:
+                            if isinstance(data["abstract"], str):  # Ensure it's a string
+                                publication.abstract = data["abstract"]
+                        updated = True
+                if updated:
+                    author.save()
+                    updated_count += 1
 
-                updated_publications.append(pub)  # Add updated publication to list
-
-            # Reassign and save
-            author.publications = updated_publications
-            author.save()  # This will persist changes now
-
-            logger.info(f"Citations and abstracts updated for PID: {pid}")
-
-            return Response({"message": "Citations and abstracts updated successfully."}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.exception(f"Error updating citations for PID {pid}: {e}")
-            return Response({"error": "Failed to update citations and abstracts."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "message": f"Successfully updated {updated_count} authors' publications.",
+            "details": fetched_data
+        }, status=status.HTTP_200_OK)
+    
 
 
 class GitHubProfileView(APIView):

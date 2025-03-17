@@ -1,6 +1,7 @@
 import logging
 import re
 from ..models import Author
+from .ollama_processor import OllamaTextProcessor
 from BaseXClient import BaseXClient
 import xml.etree.ElementTree as ET
 import requests
@@ -40,8 +41,8 @@ class AuthorSearchService:
             }
 
         # 3. Generate LLM-based description (placeholder for now)
-        description = "Some description bla bla"
-        # description = self._get_researcher_description(self.query, paper_titles)
+        # description = "Some description bla bla"
+        description = self._get_researcher_description(self.query, paper_titles)
 
         # 4. Save author to MongoDB
         author_doc = Author(
@@ -124,37 +125,19 @@ class AuthorSearchService:
 
     def _get_researcher_description(self, name, paper_titles):
         """
-        Generate a short researcher description using LLM.
+        Generate a short researcher description using Ollama LLM.
         """
-        url = "http://localhost:11434/api/generate"
-
-        papers_str = "; ".join(paper_titles) if paper_titles else "No published papers listed"
-
-        prompt = (
-            f"Generate a concise two-sentence researcher description based on the following details: "
-            f"Name: {name}. "
-            f"Notable papers: {papers_str}. "
-            f"Summarize the research focus, contributions, and impact of this researcher. "
-            f"Your response must follow this exact format: [[ description_here ]]. "
-            f"DO NOT include any extra text, disclaimers, or greetings."
-        )
-
-        payload = {
-            "model": "mistral",
-            "prompt": prompt,
-            "stream": False,
-            "options": {"seed": 42}
+        processor = OllamaTextProcessor(batch_size=1, max_tokens=50, temperature=0.7)  
+        
+        researcher = {
+            "name": name,
+            "papers": [{"title": title} for title in paper_titles]
         }
 
-        try:
-            response = requests.post(url, json=payload)
-            response.raise_for_status()
-            output_text = response.json().get("response", "")
-            match = re.search(r"\[\[(.*?)\]\]", output_text)
-            if match:
-                return match.group(1).strip()
-            else:
-                return f"Error: Unexpected format - {output_text}"
-        except requests.RequestException as e:
-            logger.error(f"Failed to generate description for {name}: {e}")
+        description = processor.generate_description(researcher)
+
+        if not description:
+            logger.error(f"Failed to generate description for {name}.")
             return "Description generation failed."
+
+        return description
