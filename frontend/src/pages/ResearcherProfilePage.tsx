@@ -36,7 +36,7 @@ const ResearcherProfilePage: React.FC = () => {
   });
 
   const { profile: researcherProfile, isLoading, isError, refetch } = useResearcherProfileQuery(name || "");
-
+  
   const {
     name: authorName = "Unknown Author",
     affiliations = [],

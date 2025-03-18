@@ -71,7 +71,7 @@ const CommonTopicsCard: React.FC<CommonTopicsCardProps> = ({ topics }) => {
         </>
       ) : (
         <Typography variant="body2" color="textSecondary">
-          No topics available.
+          Loading Topics...
         </Typography>
       )}
     </Box>

@@ -354,7 +354,7 @@ class CompareResearchersView(APIView):
 
             # If author doesn't exist OR has no publications -> fetch
             logger.info(f"Fetching researcher data for {name}")
-            fetcher = ProfileFetcher(author_name=name, extractor=KeywordExtractor())
+            fetcher = ProfileFetcher(author_name=name)
             profile_data = fetcher.fetch_profile()
 
             # Check if author now exists in DB (race condition handling)

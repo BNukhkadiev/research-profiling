@@ -26,6 +26,7 @@ export interface ResearcherProfileResponse {
   }[];
 }
 
+
 // **Step 1: Fetch Researcher Profile**
 const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileResponse> => {
   const encodedName = encodeURIComponent(name);
@@ -124,15 +125,19 @@ const computeGIndex = (publications: { citations?: number }[]) => {
 
   // **Fix Coauthors Extraction (Directly from Backend)**
   const coauthorCounts = React.useMemo(() => {
-    if (!Array.isArray(profile?.coauthors)) return [];
-
-    // ✅ Convert raw coauthor names into objects with collaboration count
-    return profile.coauthors.map((coauthor) => ({
-      name: coauthor,
-      publicationsTogether: profile.publications.filter((pub) => pub.authors.some((a) => a.name === coauthor)).length,
-    }));
-  }, [profile]);
-
+    if (!profile?.coauthors || !Array.isArray(profile.coauthors)) return [];
+  
+    return profile.coauthors.map((coauthor) => {
+      const collaborationCount = profile.publications
+        ? profile.publications.filter((pub) =>
+            pub.authors.some((author) => author.name === coauthor)
+          ).length
+        : 0;
+  
+      return { name: coauthor, publicationsTogether: collaborationCount };
+    });
+  }, [profile?.coauthors, profile?.publications]);
+  
   // **Extract DOIs Needing OpenAlex Fetch**
   const doisToFetch = React.useMemo(() => {
     if (!profile?.publications) return [];
@@ -162,9 +167,16 @@ const computeGIndex = (publications: { citations?: number }[]) => {
 
   // **Fetch Topics Only After OpenAlex**
   const generateTopicsMutation = useMutation({
-    mutationFn: () => generateTopics(doisForTopics), // ✅ Now sends full DOI links
+    mutationFn: () => generateTopics(doisForTopics),
+    onMutate: () => {
+      setLoadingTopics(true);  // ✅ Show loading when topics start fetching
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(["researcherProfile", name]);
+      setLoadingTopics(false); // ✅ Hide loading when topics are loaded
+    },
+    onError: () => {
+      setLoadingTopics(false); // ✅ Hide loading on error too
     },
   });
 

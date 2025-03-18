@@ -10,21 +10,22 @@ interface PublicationsListProps {
     venue: string;
     citations: number;
     topics: string[];
-    authors: { name: string; pid: string }[];
+    authors?: { name: string; pid?: string }[]; // ✅ Made optional
+    coauthors?: string[]; // ✅ New field for fallback
     links: string[];
   }[];
 }
 
 const PublicationsList: React.FC<PublicationsListProps> = ({ publications = [] }) => {
   const navigate = useNavigate();
-  const [visibleCount, setVisibleCount] = useState(5); // Show 5 publications initially
+  const [visibleCount, setVisibleCount] = useState(5);
 
   const handleLoadMore = () => {
     setVisibleCount((prevCount) => prevCount + 5);
   };
 
   const handleViewDetails = (publicationUrl: string) => {
-    if (!publicationUrl) return; // Safe guard
+    if (!publicationUrl) return;
     const publicationId = publicationUrl.split("/").pop() || "";
     navigate(`/publication/${publicationId}`);
   };
@@ -37,12 +38,15 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ publications = [] }
     );
   }
 
+  console.log("Publication Data:", publications);
+
   return (
     <Box>
       {publications.slice(0, visibleCount).map((pub, index) => {
         const {
           title = "Untitled Publication",
           authors = [],
+          coauthors = [], // ✅ New fallback field
           venue = "Unknown Venue",
           year = "Unknown Year",
           type = "Unknown Type",
@@ -51,9 +55,27 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ publications = [] }
           links = [],
         } = pub;
 
+        const displayAuthors =
+          authors.length > 0
+            ? authors.map((author, idx) => (
+                <React.Fragment key={author.pid || `${author.name}-${idx}`}>
+                  {author.pid ? (
+                    <Link href={`/profile/${encodeURIComponent(author.pid)}`} style={{ textDecoration: "none" }}>
+                      {author.name}
+                    </Link>
+                  ) : (
+                    author.name
+                  )}
+                  {idx < authors.length - 1 && ", "}
+                </React.Fragment>
+              ))
+            : coauthors.length > 0
+            ? coauthors.join(", ") // ✅ Use coauthors if no authors
+            : "Unknown Authors";
+
         return (
           <Box
-            key={`${title}-${index}`} // More stable key
+            key={`${title}-${index}`}
             sx={{
               p: 2,
               mb: 2,
@@ -70,24 +92,7 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ publications = [] }
 
             {/* Authors */}
             <Typography variant="body2" color="textSecondary" gutterBottom>
-              <strong>Authors:</strong>{" "}
-              {authors.length > 0
-                ? authors.map((author, idx) => (
-                    <React.Fragment key={author.pid || `${author.name}-${idx}`}>
-                      {author.pid ? (
-                        <Link
-                          href={`/profile/${encodeURIComponent(author.pid)}`}
-                          style={{ textDecoration: "none" }}
-                        >
-                          {author.name}
-                        </Link>
-                      ) : (
-                        author.name
-                      )}
-                      {idx < authors.length - 1 && ", "}
-                    </React.Fragment>
-                  ))
-                : "Unknown Authors"}
+              <strong>Authors:</strong> {displayAuthors}
             </Typography>
 
             {/* Venue & Year */}
@@ -130,12 +135,7 @@ const PublicationsList: React.FC<PublicationsListProps> = ({ publications = [] }
       {/* Load More Button */}
       {visibleCount < publications.length && (
         <Stack alignItems="center" mt={2}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleLoadMore}
-            sx={{ textTransform: "none" }}
-          >
+          <Button variant="contained" color="primary" onClick={handleLoadMore} sx={{ textTransform: "none" }}>
             Load More
           </Button>
         </Stack>
