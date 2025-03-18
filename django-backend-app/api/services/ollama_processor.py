@@ -73,9 +73,9 @@ class OllamaTextProcessor:
     # ---------------- Prompt Builders -------------------
     def build_topic_prompt(self, batch):
         prompt = "Given the following research papers, extract 2-3 key research topics for each paper.\n\n"
-        prompt += "Respond ONLY in this exact JSON format:\n{\n  \"paper_id1\": [\"topic1\", \"topic2\"],\n  \"paper_id2\": [\"topic1\", \"topic2\", \"topic3\"]\n}\n\n"
+        prompt += "Respond ONLY in this exact JSON format:\n{\n  \"DOI\": [\"topic1\", \"topic2\"],\n  \"DOI\": [\"topic1\", \"topic2\", \"DOI\"]\n}\n\n"
         for paper in batch:
-            prompt += f"Paper ID: {paper['id']}\nTitle: {paper['title']}\nAbstract: {paper['abstract']}\n\n"
+            prompt += f"DOI: {paper['id']}\nTitle: {paper['title']}\nAbstract: {paper['abstract']}\n\n"
         return prompt
 
     def build_description_prompt(self, researcher):
@@ -113,12 +113,10 @@ class OllamaTextProcessor:
             prompt = self.build_topic_prompt(batch)
         else:
             prompt = self.build_description_prompt(batch[0])  # Only one researcher per batch
-        print(prompt)
         result = self.send_request_to_ollama(prompt)
         if not result:
             print("[ERROR] Empty response from model")
             return {} if task == "topics" else ""
-
         return self.parse_topic_response(result, batch) if task == "topics" else result
 
     # ---------------- Public Methods -------------------
@@ -129,7 +127,6 @@ class OllamaTextProcessor:
 
         with ThreadPoolExecutor(max_workers=len(OLLAMA_PORTS)) as executor:
             results = list(executor.map(self.process_batch, batches))
-
         for batch_result in results:
             topics.update(batch_result)
 

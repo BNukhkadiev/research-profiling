@@ -157,8 +157,6 @@ class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
 
     # Instantiate keyword extractor once for efficiency
-    extractor = KeywordExtractor()
-
     def get(self, request):
         author_name = request.GET.get('author_name', '').strip()
 
@@ -169,7 +167,7 @@ class ResearcherProfileView(APIView):
         logger.info(f"Fetching profile for PID: {author_name}")
 
         try:
-            fetcher = ProfileFetcher(author_name, self.extractor)
+            fetcher = ProfileFetcher(author_name)
             profile_data = fetcher.fetch_profile()
 
             return Response(profile_data, status=status.HTTP_200_OK)

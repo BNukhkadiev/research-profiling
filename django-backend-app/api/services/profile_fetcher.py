@@ -1,6 +1,6 @@
 import urllib.parse
 import xml.etree.ElementTree as ET
-from collections import defaultdict, Counter
+from collections import defaultdict
 from utils.CORE import fuzzy_match
 import pandas as pd
 from django.conf import settings
@@ -18,9 +18,8 @@ core_data = pd.read_csv(
 
 
 class ProfileFetcher:
-    def __init__(self, author_name, extractor):
+    def __init__(self, author_name):
         self.author_name = author_name.strip()
-        self.extractor = extractor
         self.core_data = core_data
         self.publications_xml = []
 
@@ -37,7 +36,7 @@ class ProfileFetcher:
         # Fetch from BaseX
         self.fetch_data_from_basex()
         affiliations = self._get_author_affiliations(self.author_name)
-        publications, coauthors_dict, topic_counts = self.parse_publications()
+        publications, coauthors_dict = self.parse_publications()
 
         # CASE 2: Exists but missing publications -> update
         if author and not author.publications:
@@ -59,7 +58,7 @@ class ProfileFetcher:
             author_doc.save()
 
         # Return compiled result
-        return self.compile_results(self.author_name, affiliations, publications, coauthors_dict, topic_counts)
+        return self.compile_results(self.author_name, affiliations, publications, coauthors_dict)
 
     def _build_publications_for_db(self, publications):
         """Convert parsed dict to Publication objects for DB."""
@@ -67,7 +66,6 @@ class ProfileFetcher:
         for pub in publications:
             pub_doc = Publication(
                 title=pub["title"],
-                topics=pub["topics"],
                 abstract=pub["abstract"],
                 core_rank=pub["core_rank"],
                 citations=pub["citations"],
@@ -98,17 +96,17 @@ class ProfileFetcher:
             session.close()
 
     def parse_publications(self):
-        publications, coauthors_dict, topic_counts = [], defaultdict(int), Counter()
+        publications, coauthors_dict = [], defaultdict(int)
 
         for pub_xml in self.publications_xml:
             elem = ET.fromstring(pub_xml)
-            pub_data = self._parse_single_publication(elem, coauthors_dict, topic_counts)
+            pub_data = self._parse_single_publication(elem, coauthors_dict)
             if pub_data:
                 publications.append(pub_data)
 
-        return publications, coauthors_dict, topic_counts
+        return publications, coauthors_dict
 
-    def _parse_single_publication(self, publ_info, coauthors_dict, topic_counts):
+    def _parse_single_publication(self, publ_info, coauthors_dict):
         title = publ_info.findtext("title", "").strip()
         year = int(publ_info.findtext("year", "0") or 0)
         if title.lower() == "home page" or year == 0:
@@ -127,11 +125,8 @@ class ProfileFetcher:
             if author_name != self.author_name:
                 coauthors_dict[author_name] += 1
 
-        # Links and topics
+        # Links
         links = [ee.text.strip() for ee in publ_info.findall("ee")]
-        raw_topics = self.extractor.extract_keywords(doc=title)
-        topics = [topic[0] for topic in raw_topics]
-        topic_counts.update(topics)
 
         return {
             "title": title,
@@ -139,15 +134,13 @@ class ProfileFetcher:
             "venue": venue,
             "core_rank": core_rank,
             "citations": 0,
-            "topics": topics,
             "coauthors": authors,
             "links": links,
             "abstract": "",
             "is_preprint": is_preprint
         }
 
-    def compile_results(self, name, affiliations, publications, coauthors_dict, topic_counts):
-        topics_list = [{topic: count} for topic, count in topic_counts.most_common()]
+    def compile_results(self, name, affiliations, publications, coauthors_dict):
         coauthors_list = sorted(
             [{"name": co_name, "publications_together": count}
              for co_name, count in coauthors_dict.items()],
@@ -161,7 +154,6 @@ class ProfileFetcher:
             "total_papers": len(publications),
             "total_citations": -1,
             "publications": publications,
-            "topics": topics_list,
             "coauthors": coauthors_list
         }
 
@@ -214,7 +206,6 @@ class ProfileFetcher:
             "publications": [
                 {
                     "title": pub.title,
-                    "topics": pub.topics,
                     "abstract": pub.abstract,
                     "venue": pub.venue,
                     "core_rank": pub.core_rank,
