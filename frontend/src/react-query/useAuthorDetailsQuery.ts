@@ -1,113 +1,201 @@
-import { useQuery } from "@tanstack/react-query";
+import React from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
-// Final structure of response including venues generated from papers
+// Define structure for a researcher's profile
 export interface ResearcherProfileResponse {
   name: string;
   affiliations: string[];
   hIndex: number;
   gIndex: number;
-  totalPapers: number;
-  totalCitations: number;
-  topics: { name: string; count: number }[];
+  totalPapers?: number;
+  totalCitations?: number;
   venues: { name: string; count: number; coreRank: string }[];
-  papers: {
+  coauthors: string[]; // ✅ Now expects a direct list from backend
+  publications: {
     title: string;
     year: number;
     venue: string;
-    coreRank: string;
-    citations: number;
-    topics: string[];
+    coreRank?: string;
+    citations?: number;
+    topics?: string[];
     authors: { name: string }[];
-    links: string[];
-    abstract: string;
-    preprint: boolean;
+    links?: string[];
+    abstract?: string;
+    isPreprint: boolean;
   }[];
-  coauthors: { name: string; publicationsTogether: number }[];
 }
 
-// Fetch function
+// **Step 1: Fetch Researcher Profile**
 const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileResponse> => {
   const encodedName = encodeURIComponent(name);
+  const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?author_name=${encodedName}`);
+  return response.data;
+};
 
-  try {
-    const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?author_name=${encodedName}`);
-    const data = response.data;
+// **Step 2: Fetch OpenAlex Data**
+const fetchOpenAlexData = async (dois: string[]) => {
+  if (dois.length === 0) return Promise.resolve();
+  return axios.post("http://127.0.0.1:8000/api/open-alex/", { dois });
+};
 
-    // ✅ Transform topics
-    const topics = Array.isArray(data.topics)
-      ? data.topics.map((topic: Record<string, number>) => {
-          const topicName = Object.keys(topic)[0];
-          const count = topic[topicName];
-          return { name: topicName, count };
-        })
-      : [];
+// **Step 3: Generate Topics (LLM)**
+const generateTopics = async (dois: string[]) => {
+  if (dois.length === 0) return Promise.resolve();
+  return axios.post("http://127.0.0.1:8000/api/generate-topics/", { dois });
+};
 
-    // ✅ Transform coauthors
-    const coauthors = Array.isArray(data.coauthors)
-      ? data.coauthors.map((coauthor: any) => ({
-          name: coauthor.name,
-          publicationsTogether: coauthor.publications_together,
-        }))
-      : [];
+// **React Query Hook for Researcher Profile**
+export const useResearcherProfileQuery = (name: string) => {
+  const queryClient = useQueryClient();
 
-    // ✅ Transform papers (from backend "publications")
-    const papers = Array.isArray(data.publications)
-      ? data.publications.map((paper: any) => ({
-          title: paper.title,
-          year: paper.year,
-          venue: paper.venue || "Unknown Venue",
-          coreRank: paper.core_rank || "Unknown",
-          citations: paper.citations || 0,
-          topics: paper.topics || [],
-          authors: (paper.coauthors || []).map((author: any) => ({ name: author })),
-          links: paper.links || [],
-          abstract: paper.abstract || "",
-          preprint: paper.preprint || false,
-        }))
-      : [];
+  // **Fetch Profile First**
+  const { data: profile, isLoading, isError, refetch } = useQuery({
+    queryKey: ["researcherProfile", name],
+    queryFn: () => fetchResearcherProfile(name),
+    enabled: !!name,
+    staleTime: 5 * 60 * 1000,
+  });
 
-    // ✅ Dynamically generate venues from papers
-    const venueMap: Record<string, { count: number; coreRank: string }> = {};
-    for (const paper of papers) {
-      if (paper.venue) {
-        if (!venueMap[paper.venue]) {
-          venueMap[paper.venue] = { count: 0, coreRank: paper.coreRank };
+  // **Compute Total Papers**
+  const totalPapers = profile?.publications?.length ?? 0;
+
+  // **Compute Total Citations**
+  const totalCitations = React.useMemo(() => {
+    if (!profile?.publications) return 0;
+    return profile.publications.reduce((sum, pub) => sum + (pub.citations ?? 0), 0);
+  }, [profile?.publications]);
+
+  // **Fix Venue Counting**
+  const venueCounts = React.useMemo(() => {
+    if (!profile?.publications) return [];
+
+    const counts = profile.publications.reduce<Record<string, { count: number; coreRank: string }>>(
+      (acc, pub) => {
+        if (!pub.venue || pub.venue === "Unknown") return acc;
+        if (!acc[pub.venue]) {
+          acc[pub.venue] = { count: 0, coreRank: pub.coreRank ?? "Unknown" };
         }
-        venueMap[paper.venue].count += 1;
-      }
-    }
-    const venues = Object.entries(venueMap).map(([name, data]) => ({
+        acc[pub.venue].count += 1;
+        return acc;
+      },
+      {}
+    );
+
+    return Object.entries(counts).map(([name, data]) => ({
       name,
       count: data.count,
       coreRank: data.coreRank,
     }));
+  }, [profile]);
 
-    return {
-      name: data.name,
-      affiliations: data.affiliations || [],
-      hIndex: data.h_index ?? -1,
-      gIndex: data.g_index ?? -1,
-      totalPapers: data.total_papers ?? papers.length,
-      totalCitations: data.total_citations ?? 0,
-      topics,
-      venues,
-      papers,
-      coauthors,
-    };
-  } catch (error: any) {
-    console.error(`❌ Error fetching researcher profile for: ${name}`, error);
-    throw error.response?.data || new Error("Failed to fetch researcher profile.");
+  const computeHIndex = (publications: { citations?: number }[]) => {
+  const sortedCitations = publications
+    .map((pub) => pub.citations ?? 0)
+    .sort((a, b) => b - a);
+
+  let h = 0;
+  for (let i = 0; i < sortedCitations.length; i++) {
+    if (sortedCitations[i] >= i + 1) {
+      h = i + 1;
+    } else {
+      break;
+    }
   }
+  return h;
 };
 
-// ✅ React Query hook
-export const useResearcherProfileQuery = (name: string) => {
-  return useQuery<ResearcherProfileResponse>({
-    queryKey: ["researcherProfile", name],
-    queryFn: () => fetchResearcherProfile(name),
-    enabled: Boolean(name),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2,
+const computeGIndex = (publications: { citations?: number }[]) => {
+  const sortedCitations = publications
+    .map((pub) => pub.citations ?? 0)
+    .sort((a, b) => b - a);
+
+  let g = 0, citationSum = 0;
+  for (let i = 0; i < sortedCitations.length; i++) {
+    citationSum += sortedCitations[i];
+    if (citationSum >= (i + 1) ** 2) {
+      g = i + 1;
+    } else {
+      break;
+    }
+  }
+  return g;
+};
+
+  // **Fix Coauthors Extraction (Directly from Backend)**
+  const coauthorCounts = React.useMemo(() => {
+    if (!Array.isArray(profile?.coauthors)) return [];
+
+    // ✅ Convert raw coauthor names into objects with collaboration count
+    return profile.coauthors.map((coauthor) => ({
+      name: coauthor,
+      publicationsTogether: profile.publications.filter((pub) => pub.authors.some((a) => a.name === coauthor)).length,
+    }));
+  }, [profile]);
+
+  // **Extract DOIs Needing OpenAlex Fetch**
+  const doisToFetch = React.useMemo(() => {
+    if (!profile?.publications) return [];
+    return profile.publications
+      .filter((pub) => !pub.abstract)
+      .flatMap((pub) => pub.links ?? [])
+      .filter((link) => link.startsWith("https://doi.org/"))
+      .map((doi) => doi.replace("https://doi.org/", ""));
+  }, [profile]);
+
+  // **Fetch OpenAlex Data (If Needed)**
+  const openAlexMutation = useMutation({
+    mutationFn: () => fetchOpenAlexData(doisToFetch),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["researcherProfile", name]);
+    },
   });
+
+  // **Extract DOIs Needing Topic Generation**
+  const doisForTopics = React.useMemo(() => {
+    if (!profile?.publications) return [];
+    return profile.publications
+      .filter((pub) => !Array.isArray(pub.topics) || pub.topics.length === 0) // ✅ No need for abstract check
+      .flatMap((pub) => pub.links ?? [])
+      .filter((link) => link.startsWith("https://doi.org/")); // ✅ Keep full DOI link
+  }, [profile]);
+
+  // **Fetch Topics Only After OpenAlex**
+  const generateTopicsMutation = useMutation({
+    mutationFn: () => generateTopics(doisForTopics), // ✅ Now sends full DOI links
+    onSuccess: () => {
+      queryClient.invalidateQueries(["researcherProfile", name]);
+    },
+  });
+
+  // **Trigger OpenAlex Fetch if Needed**
+  React.useEffect(() => {
+    if (profile && doisToFetch.length > 0 && !openAlexMutation.isPending && !openAlexMutation.isSuccess) {
+      openAlexMutation.mutate();
+    }
+  }, [profile, doisToFetch, openAlexMutation.isPending, openAlexMutation.isSuccess]);
+
+  // **Trigger Topics Generation After OpenAlex**
+  React.useEffect(() => {
+    if (
+      profile &&
+      openAlexMutation.isSuccess &&
+      doisForTopics.length > 0 &&
+      !generateTopicsMutation.isPending &&
+      !generateTopicsMutation.isSuccess
+    ) {
+      generateTopicsMutation.mutate();
+    }
+  }, [profile, openAlexMutation.isSuccess, doisForTopics, generateTopicsMutation.isPending, generateTopicsMutation.isSuccess]);
+
+  return {
+    profile: profile
+      ? { ...profile, totalPapers, totalCitations, venues: venueCounts, coauthors: coauthorCounts }
+      : undefined,
+    isLoading,
+    isError,
+    refetch,
+    openAlexMutation,
+    generateTopicsMutation,
+  };
 };

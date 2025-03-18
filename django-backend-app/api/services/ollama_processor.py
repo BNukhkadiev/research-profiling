@@ -114,6 +114,7 @@ class OllamaTextProcessor:
         else:
             prompt = self.build_description_prompt(batch[0])  # Only one researcher per batch
         result = self.send_request_to_ollama(prompt)
+        print("Result", result)
         if not result:
             print("[ERROR] Empty response from model")
             return {} if task == "topics" else ""

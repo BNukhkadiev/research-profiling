@@ -73,6 +73,7 @@ class ProfileFetcher:
                 links=pub["links"],
                 year=pub['year'],
                 venue=pub["venue"],
+                topics=pub.get("topics", []),
                 is_preprint=pub["is_preprint"]
             )
             publication_docs.append(pub_doc)
@@ -137,7 +138,8 @@ class ProfileFetcher:
             "coauthors": authors,
             "links": links,
             "abstract": "",
-            "is_preprint": is_preprint
+            "is_preprint": is_preprint,
+            "topics": []
         }
 
     def compile_results(self, name, affiliations, publications, coauthors_dict):
@@ -154,6 +156,7 @@ class ProfileFetcher:
             "total_papers": len(publications),
             "total_citations": -1,
             "publications": publications,
+            "topics": [],
             "coauthors": coauthors_list
         }
 
@@ -213,6 +216,7 @@ class ProfileFetcher:
                     "coauthors": [co.name for co in pub.coauthors],
                     "links": pub.links,
                     "year": pub.year,
+                    "topics": pub.topics if pub.topics else [],
                     "is_preprint": pub.is_preprint
                 }
                 for pub in author.publications
