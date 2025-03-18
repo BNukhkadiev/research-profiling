@@ -12,12 +12,32 @@ import CoauthorsList from "../components/CoauthorsList";
 import ResearchersWork from "../components/ResearchersWork";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { useResearcherProfileQuery } from "../react-query/useAuthorDetailsQuery";
+import { useAuthorDetailsQuery } from "../react-query/useAuthorDetailsQuery";
 import {
   useComparisonResearchers,
   useAddResearcher,
   useRemoveResearcher,
 } from "../react-query/useComparisonQuery";
+
+class ErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <h1>Something went wrong. Please try again later.</h1>;
+    }
+
+    return this.props.children;
+  }
+}
 
 const ResearcherProfilePage: React.FC = () => {
   const { name } = useParams<{ name?: string }>();
@@ -35,8 +55,13 @@ const ResearcherProfilePage: React.FC = () => {
     sort: null,
   });
 
-  const { profile: researcherProfile, isLoading, isError, refetch } = useResearcherProfileQuery(name || "");
-  
+  const {
+    profile: researcherProfile,
+    isLoading,
+    isError,
+    refetch,
+  } = useAuthorDetailsQuery(name || "");
+
   const {
     name: authorName = "Unknown Author",
     affiliations = [],
@@ -60,16 +85,20 @@ const ResearcherProfilePage: React.FC = () => {
   const handleToggleCompare = () => {
     if (isSelected) {
       removeResearcherMutation.mutate(authorName, {
-        onSuccess: () => toast.error(`Removed ${authorName} from comparison list`),
+        onSuccess: () =>
+          toast.error(`Removed ${authorName} from comparison list`),
       });
     } else {
       addResearcherMutation.mutate(authorName, {
-        onSuccess: () => toast.success(`Added ${authorName} to comparison list`),
+        onSuccess: () =>
+          toast.success(`Added ${authorName} to comparison list`),
       });
     }
   };
 
-  const availableVenues = [...new Set(publications.map((p) => p.venue).filter(Boolean))];
+  const availableVenues = [
+    ...new Set(publications.map((p) => p.venue).filter(Boolean)),
+  ];
 
   // Apply filters to publications
   const filteredPublications = useMemo(() => {
@@ -82,22 +111,32 @@ const ResearcherProfilePage: React.FC = () => {
     }
 
     if (filters.coreRanking) {
-      filtered = filtered.filter((pub) => pub.core_rank === filters.coreRanking);
+      filtered = filtered.filter(
+        (pub) => pub.core_rank === filters.coreRanking
+      );
     }
 
     if (filters.yearRange) {
-      filtered = filtered.filter((pub) => pub.year >= filters.yearRange![0] && pub.year <= filters.yearRange![1]);
+      filtered = filtered.filter(
+        (pub) =>
+          pub.year >= filters.yearRange![0] && pub.year <= filters.yearRange![1]
+      );
     }
 
     if (filters.sort) {
-      filtered.sort((a, b) => (filters.sort === "asc" ? a.year - b.year : b.year - a.year));
+      filtered.sort((a, b) =>
+        filters.sort === "asc" ? a.year - b.year : b.year - a.year
+      );
     }
 
     return filtered;
   }, [publications, filters]);
 
   const totalFilteredCitations = useMemo(() => {
-    return filteredPublications.reduce((sum, pub) => sum + (pub.citations ?? 0), 0);
+    return filteredPublications.reduce(
+      (sum, pub) => sum + (pub.citations ?? 0),
+      0
+    );
   }, [filteredPublications]);
 
   const computeHIndex = (publications: { citations?: number }[]) => {
@@ -121,7 +160,8 @@ const ResearcherProfilePage: React.FC = () => {
       .map((pub) => pub.citations ?? 0)
       .sort((a, b) => b - a);
 
-    let g = 0, citationSum = 0;
+    let g = 0,
+      citationSum = 0;
     for (let i = 0; i < sortedCitations.length; i++) {
       citationSum += sortedCitations[i];
       if (citationSum >= (i + 1) ** 2) {
@@ -133,8 +173,14 @@ const ResearcherProfilePage: React.FC = () => {
     return g;
   };
 
-  const filteredHIndex = useMemo(() => computeHIndex(filteredPublications), [filteredPublications]);
-  const filteredGIndex = useMemo(() => computeGIndex(filteredPublications), [filteredPublications]);
+  const filteredHIndex = useMemo(
+    () => computeHIndex(filteredPublications),
+    [filteredPublications]
+  );
+  const filteredGIndex = useMemo(
+    () => computeGIndex(filteredPublications),
+    [filteredPublications]
+  );
 
   const statistics = {
     papers: filteredPublications.length,
@@ -145,18 +191,17 @@ const ResearcherProfilePage: React.FC = () => {
 
   // Aggregate filtered venues
   const filteredVenues = useMemo(() => {
-    const venueMap = filteredPublications.reduce<Record<string, { count: number; coreRank: string }>>(
-      (acc, pub) => {
-        if (pub.venue) {
-          if (!acc[pub.venue]) {
-            acc[pub.venue] = { count: 0, coreRank: pub.core_rank || "Unknown" };
-          }
-          acc[pub.venue].count += 1;
+    const venueMap = filteredPublications.reduce<
+      Record<string, { count: number; coreRank: string }>
+    >((acc, pub) => {
+      if (pub.venue) {
+        if (!acc[pub.venue]) {
+          acc[pub.venue] = { count: 0, coreRank: pub.core_rank || "Unknown" };
         }
-        return acc;
-      },
-      {}
-    );
+        acc[pub.venue].count += 1;
+      }
+      return acc;
+    }, {});
 
     return Object.entries(venueMap).map(([name, data]) => ({
       name,
@@ -167,33 +212,44 @@ const ResearcherProfilePage: React.FC = () => {
 
   // ✅ FIX: Ensure topics update dynamically based on filtered publications
   const filteredTopics = useMemo(() => {
-    const topicCounts = filteredPublications.reduce<Record<string, number>>((acc, pub) => {
-      if (Array.isArray(pub.topics)) {
-        pub.topics.forEach((topic) => {
-          acc[topic] = (acc[topic] || 0) + 1;
-        });
-      }
-      return acc;
-    }, {});
+    const topicCounts = filteredPublications.reduce<Record<string, number>>(
+      (acc, pub) => {
+        if (Array.isArray(pub.topics)) {
+          pub.topics.forEach((topic) => {
+            acc[topic] = (acc[topic] || 0) + 1;
+          });
+        }
+        return acc;
+      },
+      {}
+    );
 
-    return Object.entries(topicCounts).map(([name, count]) => ({ name, count }));
+    return Object.entries(topicCounts).map(([name, count]) => ({
+      name,
+      count,
+    }));
   }, [filteredPublications]);
 
   // ✅ FIX: Ensure coauthors update dynamically based on filtered publications
   const filteredCoauthors = useMemo(() => {
-    const coauthorCounts = filteredPublications.reduce<Record<string, number>>((acc, pub) => {
-      if (Array.isArray(pub.coauthors)) {
-        pub.coauthors.forEach((coauthor) => {
-          acc[coauthor] = (acc[coauthor] || 0) + 1;
-        });
-      }
-      return acc;
-    }, {});
+    const coauthorCounts = filteredPublications.reduce<Record<string, number>>(
+      (acc, pub) => {
+        if (Array.isArray(pub.coauthors)) {
+          pub.coauthors.forEach((coauthor) => {
+            acc[coauthor] = (acc[coauthor] || 0) + 1;
+          });
+        }
+        return acc;
+      },
+      {}
+    );
 
-    return Object.entries(coauthorCounts).map(([name, publicationsTogether]) => ({
-      name,
-      publicationsTogether,
-    }));
+    return Object.entries(coauthorCounts).map(
+      ([name, publicationsTogether]) => ({
+        name,
+        publicationsTogether,
+      })
+    );
   }, [filteredPublications]);
 
   const handleFilterChange = (newFilters: typeof filters) => {
@@ -204,28 +260,71 @@ const ResearcherProfilePage: React.FC = () => {
     <Box sx={{ padding: 4, backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
       <ToastContainer position="top-right" autoClose={3000} />
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-        <Filters onFilterChange={handleFilterChange} availableVenues={availableVenues} />
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 3,
+        }}
+      >
+        <Filters
+          onFilterChange={handleFilterChange}
+          availableVenues={availableVenues}
+        />
         {comparisonList.length > 0 && (
-          <Button variant="contained" onClick={() => navigate("/compare-researchers")}>
+          <Button
+            variant="contained"
+            onClick={() => navigate("/compare-researchers")}
+          >
             Go to Comparisons
           </Button>
         )}
       </Box>
 
-      <ProfileHeader author={authorName} affiliations={affiliations.join(", ") || "Affiliations not available"} onToggleCompare={handleToggleCompare} isSelected={isSelected} />
+      <ProfileHeader
+        author={authorName}
+        affiliations={affiliations.join(", ") || "Affiliations not available"}
+        onToggleCompare={handleToggleCompare}
+        isSelected={isSelected}
+      />
 
       <Box sx={{ display: "flex", gap: 4, marginTop: 4 }}>
-        <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
+        <Box
+          sx={{
+            width: "25%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
           <VenuesCard venues={filteredVenues} />
           <CommonTopicsCard topics={filteredTopics} />
         </Box>
 
-        <Box sx={{ width: "50%", display: "flex", flexDirection: "column", gap: 2 }}>
-          <ResearchersWork author={authorName} affiliations={affiliations} publications={filteredPublications} />
+        <Box
+          sx={{
+            width: "50%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <ResearchersWork
+            author={authorName}
+            affiliations={affiliations}
+            publications={filteredPublications}
+          />
         </Box>
 
-        <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
+        <Box
+          sx={{
+            width: "25%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
           <StatisticsCard author={statistics} />
           <CoauthorsList coauthors={filteredCoauthors} />
         </Box>
@@ -234,4 +333,12 @@ const ResearcherProfilePage: React.FC = () => {
   );
 };
 
-export default ResearcherProfilePage;
+const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <ResearcherProfilePage />
+    </ErrorBoundary>
+  );
+};
+
+export default App;

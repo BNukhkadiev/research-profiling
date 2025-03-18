@@ -102,18 +102,6 @@ const SearchCard: React.FC<SearchCardProps> = ({
         >
           View Profile
         </Button>
-
-        {/* Add/Remove to/from Compare */}
-        <Button
-          variant="contained"
-          onClick={addToCompare}
-          color={isSelected ? "error" : "primary"}
-          sx={{
-            textTransform: "none",
-          }}
-        >
-          {isSelected ? "Remove from Compare" : "Add to Compare"}
-        </Button>
       </Box>
     </Box>
   );

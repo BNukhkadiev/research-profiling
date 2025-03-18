@@ -17,7 +17,10 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchResultsPage />} />
-        <Route path="/profile/:name" element={<ResearcherProfilePage />} />{" "}
+        <Route
+          path="/profile/:name"
+          element={<ResearcherProfilePage key={window.location.pathname} />}
+        />{" "}
         {/* Updated Route */}
         {/* Updated Route */}
         <Route

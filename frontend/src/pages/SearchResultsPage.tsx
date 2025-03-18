@@ -8,11 +8,6 @@ import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import SearchCard from "../components/SearchCard"; // Researcher card
 import { useResearcherQuery } from "../react-query/useResearchersQuery";
-import {
-  useComparisonResearchers,
-  useAddResearcher,
-  useRemoveResearcher,
-} from "../react-query/useComparisonQuery";
 
 const SearchResultsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -24,12 +19,6 @@ const SearchResultsPage: React.FC = () => {
     "researchers"
   );
 
-  // ✅ Fetch selected researchers from backend comparison list
-  const { comparisonList = [], isLoading: loadingComparison } =
-    useComparisonResearchers();
-  const addResearcherMutation = useAddResearcher();
-  const removeResearcherMutation = useRemoveResearcher();
-
   // ✅ Fetch single researcher based on search query
   const { data: researcher, isLoading: loadingResearchers } =
     useResearcherQuery(activeTab === "researchers" ? searchQuery : "");
@@ -38,23 +27,6 @@ const SearchResultsPage: React.FC = () => {
   const handleSearch = () => {
     setSearchQuery(query);
     navigate(`?query=${query}`);
-  };
-
-  // ✅ Add/remove researcher from comparison list (Instant UI Update + Notification)
-  const handleToggleCompare = (name: string) => {
-    if (comparisonList.includes(name)) {
-      removeResearcherMutation.mutate(name, {
-        onSuccess: () => {
-          toast.error(`Removed ${name} from comparison list`); // ✅ Show error-style notification
-        },
-      });
-    } else {
-      addResearcherMutation.mutate(name, {
-        onSuccess: () => {
-          toast.success(`Added ${name} to comparison list`); // ✅ Show success notification
-        },
-      });
-    }
   };
 
   return (
@@ -92,27 +64,15 @@ const SearchResultsPage: React.FC = () => {
         <Button
           variant={activeTab === "publications" ? "contained" : "outlined"}
           onClick={() => setActiveTab("publications")}
-          disabled={comparisonList.length === 0}
         >
           Publications
         </Button>
       </Box>
 
       {/* Go to Comparison Button */}
-      {activeTab === "researchers" && (
-        <Box sx={{ marginBottom: 3, textAlign: "right" }}>
-          <Button
-            variant="contained"
-            onClick={() => navigate("/compare-researchers")}
-            disabled={comparisonList.length === 0}
-          >
-            Go to Comparison
-          </Button>
-        </Box>
-      )}
 
       {/* Display Results */}
-      {loadingResearchers || loadingComparison ? (
+      {loadingResearchers ? (
         <Typography>Loading...</Typography>
       ) : activeTab === "researchers" ? (
         researcher ? (
@@ -120,8 +80,6 @@ const SearchResultsPage: React.FC = () => {
             name={researcher.name}
             affiliations={researcher.affiliations}
             description={researcher.description}
-            addToCompare={() => handleToggleCompare(researcher.name)}
-            isSelected={comparisonList.includes(researcher.name)}
             onViewProfile={() =>
               navigate(`/profile/${encodeURIComponent(researcher.name)}`)
             }

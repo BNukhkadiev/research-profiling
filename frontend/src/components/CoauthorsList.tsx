@@ -5,8 +5,8 @@ import ListItem from "@mui/material/ListItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import PersonIcon from "@mui/icons-material/Person";
-import { Link } from "react-router-dom";
 import { Typography, Button } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 interface Coauthor {
   name: string;
@@ -20,10 +20,19 @@ interface CoauthorsListProps {
 const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
   const LOAD_STEP = 10; // ✅ Number of coauthors to load per step
   const [visibleCount, setVisibleCount] = useState(LOAD_STEP); // Show first 'LOAD_STEP' coauthors
+  const navigate = useNavigate();
 
-  // Show more coauthors (next step)
+  // Function to load more coauthors
   const handleLoadMore = () => {
-    setVisibleCount((prevCount) => Math.min(prevCount + LOAD_STEP, coauthors.length));
+    setVisibleCount((prevCount) =>
+      Math.min(prevCount + LOAD_STEP, coauthors.length)
+    );
+  };
+
+  // Function to handle coauthor click
+  const handleCoauthorClick = (name: string) => {
+    const encodedName = encodeURIComponent(name);
+    navigate(`/profile/${encodedName}`); // ✅ Navigate to new profile & trigger query update
   };
 
   return (
@@ -44,29 +53,21 @@ const CoauthorsList: React.FC<CoauthorsListProps> = ({ coauthors }) => {
       {coauthors.length > 0 ? (
         <>
           <List>
-            {coauthors.slice(0, visibleCount).map((coauthor) => {
-              const encodedName = encodeURIComponent(coauthor.name);
-              return (
-                <ListItem key={coauthor.name} sx={{ padding: "8px 0" }}>
-                  <ListItemIcon>
-                    <PersonIcon sx={{ color: "#1976d2" }} />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      <>
-                        <Link
-                          to={`/profile/${encodedName}`}
-                          style={{ textDecoration: "none", color: "#1976d2" }}
-                        >
-                          {coauthor.name}
-                        </Link>{" "}
-                        – {coauthor.publicationsTogether} papers
-                      </>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
+            {coauthors.slice(0, visibleCount).map((coauthor) => (
+              <ListItem
+                key={coauthor.name}
+                sx={{ padding: "8px 0", cursor: "pointer" }}
+                onClick={() => handleCoauthorClick(coauthor.name)} // ✅ Update profile on click
+                button
+              >
+                <ListItemIcon>
+                  <PersonIcon sx={{ color: "#1976d2" }} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={`${coauthor.name} – ${coauthor.publicationsTogether} papers`}
+                />
+              </ListItem>
+            ))}
           </List>
 
           {/* Load More Button */}

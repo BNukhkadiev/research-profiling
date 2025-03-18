@@ -129,7 +129,8 @@ class AuthorSearchService:
             "papers": [{"title": title} for title in paper_titles[:10]]
         }
 
-        description = processor.generate_description(researcher)
+        # description = processor.generate_description(researcher)
+        description = "blla blla blla"
 
         if not description:
             logger.error(f"Failed to generate description for {name}.")

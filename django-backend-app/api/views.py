@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 from urllib.parse import unquote
 import requests
@@ -156,7 +157,6 @@ class SearchView(APIView):
 class ResearcherProfileView(APIView):
     permission_classes = [AllowAny]
 
-    # Instantiate keyword extractor once for efficiency
     def get(self, request):
         author_name = request.GET.get('author_name', '').strip()
 
@@ -164,18 +164,21 @@ class ResearcherProfileView(APIView):
             logger.warning("No NAME provided in request")
             return Response({"error": "NAME parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        logger.info(f"Fetching profile for PID: {author_name}")
+        logger.info(f"Fetching profile for author: {author_name}")
 
         try:
             fetcher = ProfileFetcher(author_name)
             profile_data = fetcher.fetch_profile()
+
+            # Ensure coauthors are extracted and added to response
+            profile_data["coauthors"] = self.extract_coauthors(profile_data["publications"], author_name)
 
             return Response(profile_data, status=status.HTTP_200_OK)
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching data from DBLP for NAME {author_name}: {e}")
             return Response({"error": "Failed to fetch data from DBLP."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
         except ValueError as e:
             logger.error(f"Invalid NAME or no data found for NAME {author_name}: {e}")
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
@@ -183,6 +186,23 @@ class ResearcherProfileView(APIView):
         except Exception as e:
             logger.exception(f"Unexpected error occurred for NAME {author_name}: {e}")
             return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def extract_coauthors(self, publications, author_name):
+        """
+        Extracts coauthors from a given list of publications and counts how many times they appear.
+        """
+        coauthors_dict = defaultdict(int)
+
+        for pub in publications:
+            for coauthor in pub["coauthors"]:
+                if coauthor != author_name:
+                    coauthors_dict[coauthor] += 1
+
+        return sorted(
+            [{"name": name, "publications_together": count} for name, count in coauthors_dict.items()],
+            key=lambda x: x["publications_together"],
+            reverse=True
+        )
 
 
 

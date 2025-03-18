@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
 // Define structure for a researcher's profile
-export interface ResearcherProfileResponse {
+export interface useAuthorDetailsQuery {
   name: string;
   affiliations: string[];
   hIndex: number;
@@ -11,7 +11,7 @@ export interface ResearcherProfileResponse {
   totalPapers?: number;
   totalCitations?: number;
   venues: { name: string; count: number; coreRank: string }[];
-  coauthors: string[]; // ✅ Now expects a direct list from backend
+  coauthors: { name: string; publicationsTogether: number }[]; // ✅ Now expects a structured list
   publications: {
     title: string;
     year: number;
@@ -26,11 +26,12 @@ export interface ResearcherProfileResponse {
   }[];
 }
 
-
 // **Step 1: Fetch Researcher Profile**
 const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileResponse> => {
   const encodedName = encodeURIComponent(name);
-  const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?author_name=${encodedName}`);
+  const response = await axios.get(
+    `http://127.0.0.1:8000/api/researcher-profile/?author_name=${encodedName}`
+  );
   return response.data;
 };
 
@@ -47,7 +48,7 @@ const generateTopics = async (dois: string[]) => {
 };
 
 // **React Query Hook for Researcher Profile**
-export const useResearcherProfileQuery = (name: string) => {
+export const useAuthorDetailsQuery = (name: string) => {
   const queryClient = useQueryClient();
 
   // **Fetch Profile First**
@@ -57,6 +58,20 @@ export const useResearcherProfileQuery = (name: string) => {
     enabled: !!name,
     staleTime: 5 * 60 * 1000,
   });
+
+  // **Ensure Query Refetches When Clicking on a Coauthor**
+  React.useEffect(() => {
+    if (name) {
+      refetch(); // ✅ Force data refresh when user clicks a coauthor
+    }
+  }, [name, refetch]);
+
+  // **Force Query Cache Invalidation When Profile Changes**
+  React.useEffect(() => {
+    if (profile) {
+      queryClient.invalidateQueries(["researcherProfile", name]); // ✅ Ensure fresh data
+    }
+  }, [name, profile, queryClient]);
 
   // **Compute Total Papers**
   const totalPapers = profile?.publications?.length ?? 0;
@@ -90,54 +105,41 @@ export const useResearcherProfileQuery = (name: string) => {
     }));
   }, [profile]);
 
+  // **Compute H-Index**
   const computeHIndex = (publications: { citations?: number }[]) => {
-  const sortedCitations = publications
-    .map((pub) => pub.citations ?? 0)
-    .sort((a, b) => b - a);
+    const sortedCitations = publications.map((pub) => pub.citations ?? 0).sort((a, b) => b - a);
 
-  let h = 0;
-  for (let i = 0; i < sortedCitations.length; i++) {
-    if (sortedCitations[i] >= i + 1) {
-      h = i + 1;
-    } else {
-      break;
+    let h = 0;
+    for (let i = 0; i < sortedCitations.length; i++) {
+      if (sortedCitations[i] >= i + 1) {
+        h = i + 1;
+      } else {
+        break;
+      }
     }
-  }
-  return h;
-};
+    return h;
+  };
 
-const computeGIndex = (publications: { citations?: number }[]) => {
-  const sortedCitations = publications
-    .map((pub) => pub.citations ?? 0)
-    .sort((a, b) => b - a);
+  // **Compute G-Index**
+  const computeGIndex = (publications: { citations?: number }[]) => {
+    const sortedCitations = publications.map((pub) => pub.citations ?? 0).sort((a, b) => b - a);
 
-  let g = 0, citationSum = 0;
-  for (let i = 0; i < sortedCitations.length; i++) {
-    citationSum += sortedCitations[i];
-    if (citationSum >= (i + 1) ** 2) {
-      g = i + 1;
-    } else {
-      break;
+    let g = 0,
+      citationSum = 0;
+    for (let i = 0; i < sortedCitations.length; i++) {
+      citationSum += sortedCitations[i];
+      if (citationSum >= (i + 1) ** 2) {
+        g = i + 1;
+      } else {
+        break;
+      }
     }
-  }
-  return g;
-};
+    return g;
+  };
 
-  // **Fix Coauthors Extraction (Directly from Backend)**
-  const coauthorCounts = React.useMemo(() => {
-    if (!profile?.coauthors || !Array.isArray(profile.coauthors)) return [];
-  
-    return profile.coauthors.map((coauthor) => {
-      const collaborationCount = profile.publications
-        ? profile.publications.filter((pub) =>
-            pub.authors.some((author) => author.name === coauthor)
-          ).length
-        : 0;
-  
-      return { name: coauthor, publicationsTogether: collaborationCount };
-    });
-  }, [profile?.coauthors, profile?.publications]);
-  
+  // ✅ **Use Coauthors Directly from Backend**
+  const coauthors = profile?.coauthors || [];
+
   // **Extract DOIs Needing OpenAlex Fetch**
   const doisToFetch = React.useMemo(() => {
     if (!profile?.publications) return [];
@@ -160,49 +162,22 @@ const computeGIndex = (publications: { citations?: number }[]) => {
   const doisForTopics = React.useMemo(() => {
     if (!profile?.publications) return [];
     return profile.publications
-      .filter((pub) => !Array.isArray(pub.topics) || pub.topics.length === 0) // ✅ No need for abstract check
+      .filter((pub) => !Array.isArray(pub.topics) || pub.topics.length === 0)
       .flatMap((pub) => pub.links ?? [])
-      .filter((link) => link.startsWith("https://doi.org/")); // ✅ Keep full DOI link
+      .filter((link) => link.startsWith("https://doi.org/"));
   }, [profile]);
 
   // **Fetch Topics Only After OpenAlex**
   const generateTopicsMutation = useMutation({
     mutationFn: () => generateTopics(doisForTopics),
-    onMutate: () => {
-      setLoadingTopics(true);  // ✅ Show loading when topics start fetching
-    },
     onSuccess: () => {
       queryClient.invalidateQueries(["researcherProfile", name]);
-      setLoadingTopics(false); // ✅ Hide loading when topics are loaded
-    },
-    onError: () => {
-      setLoadingTopics(false); // ✅ Hide loading on error too
     },
   });
 
-  // **Trigger OpenAlex Fetch if Needed**
-  React.useEffect(() => {
-    if (profile && doisToFetch.length > 0 && !openAlexMutation.isPending && !openAlexMutation.isSuccess) {
-      openAlexMutation.mutate();
-    }
-  }, [profile, doisToFetch, openAlexMutation.isPending, openAlexMutation.isSuccess]);
-
-  // **Trigger Topics Generation After OpenAlex**
-  React.useEffect(() => {
-    if (
-      profile &&
-      openAlexMutation.isSuccess &&
-      doisForTopics.length > 0 &&
-      !generateTopicsMutation.isPending &&
-      !generateTopicsMutation.isSuccess
-    ) {
-      generateTopicsMutation.mutate();
-    }
-  }, [profile, openAlexMutation.isSuccess, doisForTopics, generateTopicsMutation.isPending, generateTopicsMutation.isSuccess]);
-
   return {
     profile: profile
-      ? { ...profile, totalPapers, totalCitations, venues: venueCounts, coauthors: coauthorCounts }
+      ? { ...profile, totalPapers, totalCitations, venues: venueCounts, coauthors }
       : undefined,
     isLoading,
     isError,

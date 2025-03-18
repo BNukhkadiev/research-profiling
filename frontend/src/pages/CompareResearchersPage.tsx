@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -13,6 +14,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { toast, ToastContainer } from "react-toastify";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import "react-toastify/dist/ReactToastify.css";
 import {
   useComparisonResearchers,
@@ -23,9 +25,44 @@ import CoreRankingBarChart from "../components/CoreRankingBarChart";
 import ResearchAreasPieChart from "../components/ResearchAreasPieChart";
 import WordCloudChart from "../components/WordCloudChart";
 
+const computeHIndex = (publications: { citations?: number }[]) => {
+  const sortedCitations = publications
+    .map((pub) => pub.citations ?? 0)
+    .sort((a, b) => b - a);
+
+  let h = 0;
+  for (let i = 0; i < sortedCitations.length; i++) {
+    if (sortedCitations[i] >= i + 1) {
+      h = i + 1;
+    } else {
+      break;
+    }
+  }
+  return h;
+};
+
+const computeGIndex = (publications: { citations?: number }[]) => {
+  const sortedCitations = publications
+    .map((pub) => pub.citations ?? 0)
+    .sort((a, b) => b - a);
+
+  let g = 0,
+    citationSum = 0;
+  for (let i = 0; i < sortedCitations.length; i++) {
+    citationSum += sortedCitations[i];
+    if (citationSum >= (i + 1) ** 2) {
+      g = i + 1;
+    } else {
+      break;
+    }
+  }
+  return g;
+};
+
 const CompareResearchersPage = () => {
   const { researchers, isLoading } = useComparisonResearchers();
   const removeResearcherMutation = useRemoveResearcher();
+  const navigate = useNavigate();
 
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedResearcher, setSelectedResearcher] = useState<string | null>(
@@ -78,71 +115,105 @@ const CompareResearchersPage = () => {
 
   return (
     <Box sx={{ padding: 4 }}>
-      <ToastContainer position="top-right" autoClose={3000} />
-
-      <Typography variant="h4" sx={{ marginBottom: 4 }}>
-        Compare Researchers
-      </Typography>
+      {/* Title + Plus Button */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 4,
+        }}
+      >
+        <Typography variant="h4">Compare Researchers</Typography>
+      </Box>
 
       {/* Researcher Info Cards */}
       <Grid container spacing={2}>
-        {researchers.map(({ name, data, isLoading, isError }) => (
-          <Grid item xs={12} sm={6} md={4} key={name}>
-            <Box
-              sx={{
-                position: "relative",
-                padding: 2,
-                backgroundColor: "#fff",
-                borderRadius: 2,
-                boxShadow: 2,
-              }}
-            >
-              <IconButton
-                onClick={() => handleOpenDialog(name)}
+        {researchers.map(({ name, data, isLoading, isError }) => {
+          const totalPapers = data?.publications?.length || 0;
+          const totalCitations = data?.publications?.reduce(
+            (sum, pub) => sum + (pub.citations ?? 0),
+            0
+          );
+          const hIndex = computeHIndex(data?.publications || []);
+          const gIndex = computeGIndex(data?.publications || []);
+
+          return (
+            <Grid item xs={12} sm={6} md={4} key={name}>
+              <Box
                 sx={{
-                  position: "absolute",
-                  top: 4,
-                  right: 4,
-                  color: "gray",
-                  "&:hover": { color: "black" },
+                  position: "relative",
+                  padding: 2,
+                  backgroundColor: "#fff",
+                  borderRadius: 2,
+                  boxShadow: 2,
                 }}
               >
-                <CloseIcon fontSize="small" />
-              </IconButton>
+                <IconButton
+                  onClick={() => handleOpenDialog(name)}
+                  sx={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    color: "gray",
+                    "&:hover": { color: "black" },
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
 
-              {isLoading ? (
-                <CircularProgress />
-              ) : isError || !data ? (
-                <Typography color="error">
-                  Failed to load researcher {name}
-                </Typography>
-              ) : (
-                <>
-                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                    {data.name}
+                {isLoading ? (
+                  <CircularProgress />
+                ) : isError || !data ? (
+                  <Typography color="error">
+                    Failed to load researcher {name}
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    color="textSecondary"
-                    sx={{ mb: 1 }}
-                  >
-                    {data.affiliations?.join(", ") || "No affiliations"}
-                  </Typography>
-                  <Typography variant="body1">
-                    <strong>H-Index:</strong> {data.hIndex ?? "N/A"}
-                  </Typography>
-                  <Typography variant="body1">
-                    <strong>Total Papers:</strong> {data.totalPapers ?? "N/A"}
-                  </Typography>
-                  <Typography variant="body1">
-                    <strong>Total Citations:</strong>{" "}
-                    {data.totalCitations ?? "N/A"}
-                  </Typography>
-                </>
-              )}
-            </Box>
-          </Grid>
-        ))}
+                ) : (
+                  <>
+                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                      {data.name}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="textSecondary"
+                      sx={{ mb: 1 }}
+                    >
+                      {data.affiliations?.join(", ") || "No affiliations"}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>H-Index:</strong> {hIndex ?? "N/A"}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>G-Index:</strong> {gIndex ?? "N/A"}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>Total Papers:</strong> {totalPapers ?? "N/A"}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>Total Citations:</strong>{" "}
+                      {totalCitations ?? "N/A"}
+                    </Typography>
+                  </>
+                )}
+              </Box>
+            </Grid>
+          );
+        })}
+        {/* ✅ Plus Button to go back and search more researchers */}
+        <IconButton
+          onClick={() => navigate("/")}
+          sx={{
+            color: "#232E58 !important", // Ensures it stays blue
+            transition: "transform 0.2s, color 0.2s",
+            "&:hover": {
+              backgroundColor: "#F4F4F4 !important", // Ensures hover color stays blue
+              transform: "scale(1.3)", // Makes the icon slightly larger on hover
+            },
+          }}
+        >
+          <AddCircleOutlineIcon sx={{ fontSize: 32 }} />{" "}
+          {/* Bigger default size */}
+        </IconButton>
       </Grid>
 
       {/* Confirmation Dialog */}
