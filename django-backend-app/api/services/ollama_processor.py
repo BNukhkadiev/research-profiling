@@ -79,8 +79,13 @@ class OllamaTextProcessor:
         return prompt
 
     def build_description_prompt(self, researcher):
-        return f"Generate a concise and professional researcher description for {researcher['name']}, summarizing in two sentences their key areas of expertise based on the following papers:\n\n" + \
-               "\n\n".join(f"- {paper['title']}" for paper in researcher['papers'])
+        paper_titles = ", ".join(paper["title"] for paper in researcher["papers"])
+
+        return (
+            f"Write a CONCISE two-sentence summary of {researcher['name']}'s research focus and contributions. "
+            f"Notable papers: {paper_titles}. "
+            f"DO NOT include introductions, disclaimers, or extra details."
+        )
 
     # ---------------- Response Parsing -------------------
     def parse_topic_response(self, response_text, batch):
@@ -108,7 +113,7 @@ class OllamaTextProcessor:
             prompt = self.build_topic_prompt(batch)
         else:
             prompt = self.build_description_prompt(batch[0])  # Only one researcher per batch
-
+        print(prompt)
         result = self.send_request_to_ollama(prompt)
         if not result:
             print("[ERROR] Empty response from model")

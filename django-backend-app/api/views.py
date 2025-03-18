@@ -12,10 +12,12 @@ from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
 import xml.etree.ElementTree as ET
 from utils.keybert import KeywordExtractor
+
 import string
 from .services.profile_fetcher import ProfileFetcher
 from .services.author_search import AuthorSearchService
 from .services.openalex_service import OpenAlexFetcher
+from .services.ollama_processor import OllamaTextProcessor
 import asyncio
 from api.models import Author  # Ensure this matches your models import path
 import time 
@@ -248,6 +250,73 @@ class OpenAlexView(APIView):
         }, status=status.HTTP_200_OK)
     
 
+class GenerateTopicsView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        dois = request.data.get("dois", [])
+        if not dois or not isinstance(dois, list):
+            return Response({"error": "A list of DOIs must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        processor = OllamaTextProcessor(batch_size=3, max_tokens=130, temperature=0.6)  # Create processor instance
+        updated_count = 0
+        updated_publications = []
+        existing_publications = []  # Store publications that already have topics
+
+        # Collect papers for batch processing
+        papers_to_process = []
+
+        for doi in dois:
+            authors = Author.objects(publications__links__contains=doi)
+            for author in authors:
+                for publication in author.publications:
+                    if doi in publication.links:
+                        # If topics already exist, return existing ones instead of extracting again
+                        if publication.topics:
+                            existing_publications.append({
+                                "doi": doi,
+                                "title": publication.title,
+                                "abstract": publication.abstract,
+                                "topics": publication.topics
+                            })
+                            continue  # Skip topic extraction for this paper
+
+                        # Concatenate title and abstract for topic extraction
+                        text_to_analyze = f"{publication.title} {publication.abstract}".strip()
+                        if not text_to_analyze:
+                            continue  # Skip if both title and abstract are empty
+
+                        papers_to_process.append({
+                            "id": doi,  # Using DOI as a unique identifier
+                            "title": publication.title,
+                            "abstract": publication.abstract
+                        })
+
+        # Generate topics in batch if there are new papers to process
+        if papers_to_process:
+            topics_dict = processor.generate_topics(papers_to_process)
+
+            # Update publications with extracted topics
+            for doi, topics in topics_dict.items():
+                for author in Author.objects(publications__links__contains=doi):
+                    for publication in author.publications:
+                        if doi in publication.links and not publication.topics:
+                            publication.topics = topics
+                            author.save()
+                            updated_count += 1
+                            updated_publications.append({
+                                "doi": doi,
+                                "title": publication.title,
+                                "abstract": publication.abstract,
+                                "topics": publication.topics
+                            })
+
+        return Response({
+            "message": f"Successfully updated topics for {updated_count} publications.",
+            "updated_publications": updated_publications,
+            "existing_publications": existing_publications
+        }, status=status.HTTP_200_OK)
+
 
 class GitHubProfileView(APIView):
     permission_classes = [AllowAny]
@@ -328,10 +397,8 @@ class GitHubProfileView(APIView):
         return Response({"github_url": github_url}, status=status.HTTP_200_OK)
     
 
-
 # Global comparison list to store researcher names
 comparison_list = set()
-
 class CompareResearchersView(APIView):
     permission_classes = [AllowAny]
     """
