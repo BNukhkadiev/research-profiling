@@ -1,6 +1,7 @@
 from django.urls import path, re_path
 from .views import  CompareResearchersView, PublicationSearchView, PaperDetailsView
 from .views import SearchView, ResearcherProfileView, OpenAlexView, GenerateTopicsView
+from .views import GitHubProfileView, HuggingFaceProfileView
 
 
 urlpatterns = [
@@ -10,7 +11,9 @@ urlpatterns = [
     path('researcher-profile/', ResearcherProfileView.as_view(), name='researcher-profile'),
     path('compare-researchers/', CompareResearchersView.as_view(), name='compare-researchers'),  #  ADD THIS!
     path('open-alex/', OpenAlexView.as_view(), name='open-alex'), 
-    path('generate-topics/', GenerateTopicsView.as_view(), name='generate-topics'), 
+    path('generate-topics/', GenerateTopicsView.as_view(), name='generate-topics'),
+    path('github-profile/', GitHubProfileView.as_view(), name='github-profile'),
+    path('huggingfacedata/', HuggingFaceProfileView.as_view(), name='huggingface-profile') 
 ]
 
 

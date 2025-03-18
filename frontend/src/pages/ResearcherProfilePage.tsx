@@ -222,7 +222,7 @@ const ResearcherProfilePage: React.FC = () => {
         </Box>
 
         <Box sx={{ width: "50%", display: "flex", flexDirection: "column", gap: 2 }}>
-          <ResearchersWork author={authorName} publications={filteredPublications} />
+          <ResearchersWork author={authorName} affiliations={affiliations} publications={filteredPublications} />
         </Box>
 
         <Box sx={{ width: "25%", display: "flex", flexDirection: "column", gap: 2 }}>
