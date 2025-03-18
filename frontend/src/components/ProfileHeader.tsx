@@ -9,7 +9,7 @@ interface ProfileHeaderProps {
   author: string;
   profileUrl?: string; // Profile URL is optional
   affiliations?: string; // Affiliations are optional
-  addToCompare: () => void;
+  onToggleCompare: () => void; // ✅ Updated function name
   isSelected: boolean;
 }
 
@@ -17,7 +17,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   author,
   profileUrl,
   affiliations,
-  addToCompare,
+  onToggleCompare, // ✅ Updated prop name
   isSelected,
 }) => {
   return (
@@ -38,7 +38,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <img
           src={
             profileUrl ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(author)}&background=random`
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              author
+            )}&background=random`
           } // Fallback to generated avatar
           alt={`${author}'s profile`}
           style={{
@@ -49,7 +51,10 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           }}
         />
         <Box>
-          <Typography variant="h6" sx={{ marginBottom: 0.5, wordWrap: "break-word" }}>
+          <Typography
+            variant="h6"
+            sx={{ marginBottom: 0.5, wordWrap: "break-word" }}
+          >
             {author}
           </Typography>
           <Tooltip title={affiliations || "Affiliations not available"} arrow>
@@ -98,7 +103,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       {/* Add to Compare Button */}
       <Button
         variant="contained"
-        onClick={addToCompare}
+        onClick={onToggleCompare} // ✅ Use updated function name
         color={isSelected ? "error" : "primary"}
         sx={{
           textTransform: "none",

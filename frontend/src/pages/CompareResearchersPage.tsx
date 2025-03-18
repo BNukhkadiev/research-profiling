@@ -1,12 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Typography,
   Grid,
   CircularProgress,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import {
   useComparisonResearchers,
   useRemoveResearcher,
@@ -20,7 +27,31 @@ const CompareResearchersPage = () => {
   const { researchers, isLoading } = useComparisonResearchers();
   const removeResearcherMutation = useRemoveResearcher();
 
-  console.log("Researchers List:", researchers);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedResearcher, setSelectedResearcher] = useState<string | null>(
+    null
+  );
+
+  const handleOpenDialog = (name: string) => {
+    setSelectedResearcher(name);
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedResearcher(null);
+  };
+
+  const handleConfirmRemove = () => {
+    if (selectedResearcher) {
+      removeResearcherMutation.mutate(selectedResearcher, {
+        onSuccess: () => {
+          toast.success(`Removed ${selectedResearcher} from comparison list`);
+          handleCloseDialog();
+        },
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -47,6 +78,8 @@ const CompareResearchersPage = () => {
 
   return (
     <Box sx={{ padding: 4 }}>
+      <ToastContainer position="top-right" autoClose={3000} />
+
       <Typography variant="h4" sx={{ marginBottom: 4 }}>
         Compare Researchers
       </Typography>
@@ -65,7 +98,7 @@ const CompareResearchersPage = () => {
               }}
             >
               <IconButton
-                onClick={() => removeResearcherMutation.mutate(name)}
+                onClick={() => handleOpenDialog(name)}
                 sx={{
                   position: "absolute",
                   top: 4,
@@ -102,7 +135,8 @@ const CompareResearchersPage = () => {
                     <strong>Total Papers:</strong> {data.totalPapers ?? "N/A"}
                   </Typography>
                   <Typography variant="body1">
-                    <strong>Total Citations:</strong> {data.totalCitations ?? "N/A"}
+                    <strong>Total Citations:</strong>{" "}
+                    {data.totalCitations ?? "N/A"}
                   </Typography>
                 </>
               )}
@@ -110,6 +144,29 @@ const CompareResearchersPage = () => {
           </Grid>
         ))}
       </Grid>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
+        <DialogTitle>Remove Researcher</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to remove{" "}
+            <strong>{selectedResearcher}</strong> from the comparison list?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="secondary">
+            No
+          </Button>
+          <Button
+            onClick={handleConfirmRemove}
+            color="primary"
+            variant="contained"
+          >
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Charts for Comparison */}
       {researchers.length > 0 && (
@@ -147,7 +204,13 @@ const CompareResearchersPage = () => {
           {/* Word Clouds */}
           <Grid container spacing={4} sx={{ marginTop: 4 }}>
             {researchers.map(({ data }) => (
-              <Grid item xs={12} sm={6} md={4} key={data?.name || Math.random()}>
+              <Grid
+                item
+                xs={12}
+                sm={6}
+                md={4}
+                key={data?.name || Math.random()}
+              >
                 <Typography
                   variant="h6"
                   sx={{
@@ -159,9 +222,7 @@ const CompareResearchersPage = () => {
                   {data?.name || "Unknown"}'s Word Cloud
                 </Typography>
                 <WordCloudChart
-                  topics={
-                    data?.publications?.flatMap((p) => p.topics) || []
-                  }
+                  topics={data?.publications?.flatMap((p) => p.topics) || []}
                 />
               </Grid>
             ))}
