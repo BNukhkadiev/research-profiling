@@ -72,3 +72,5 @@ crontab -l
 Ensure your scripts are executable, For example: 
 chmod +x $BASE_DIR/datasets/download_dblp.sh
 chmod +x $PROJECT_DIR/run_refresh.sh
+
+Install the following packages: wget, baseX and bash
