@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify"; // ✅ Import Toastify
+import "react-toastify/dist/ReactToastify.css"; // ✅ Import Toastify styles
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import SearchCard from "../components/SearchCard"; // Researcher card
-import { useResearcherQuery } from "../react-query/useResearchersQuery"; // ✅ Make sure this is singular now!
+import { useResearcherQuery } from "../react-query/useResearchersQuery";
 import {
   useComparisonResearchers,
   useAddResearcher,
@@ -29,9 +31,8 @@ const SearchResultsPage: React.FC = () => {
   const removeResearcherMutation = useRemoveResearcher();
 
   // ✅ Fetch single researcher based on search query
-  const { data: researcher, isLoading: loadingResearchers } = useResearcherQuery(
-    activeTab === "researchers" ? searchQuery : ""
-  );
+  const { data: researcher, isLoading: loadingResearchers } =
+    useResearcherQuery(activeTab === "researchers" ? searchQuery : "");
 
   // ✅ Trigger search
   const handleSearch = () => {
@@ -39,17 +40,28 @@ const SearchResultsPage: React.FC = () => {
     navigate(`?query=${query}`);
   };
 
-  // ✅ Add/remove researcher from comparison list (Instant UI Update)
+  // ✅ Add/remove researcher from comparison list (Instant UI Update + Notification)
   const handleToggleCompare = (name: string) => {
     if (comparisonList.includes(name)) {
-      removeResearcherMutation.mutate(name);
+      removeResearcherMutation.mutate(name, {
+        onSuccess: () => {
+          toast.error(`Removed ${name} from comparison list`); // ✅ Show error-style notification
+        },
+      });
     } else {
-      addResearcherMutation.mutate(name);
+      addResearcherMutation.mutate(name, {
+        onSuccess: () => {
+          toast.success(`Added ${name} to comparison list`); // ✅ Show success notification
+        },
+      });
     }
   };
 
   return (
     <Box sx={{ padding: 4 }}>
+      {/* Toast Notifications */}
+      <ToastContainer position="top-right" autoClose={3000} />
+
       {/* Search Bar */}
       <Box sx={{ display: "flex", alignItems: "center", marginBottom: 3 }}>
         <TextField
@@ -91,7 +103,7 @@ const SearchResultsPage: React.FC = () => {
         <Box sx={{ marginBottom: 3, textAlign: "right" }}>
           <Button
             variant="contained"
-            onClick={() => navigate(`/compare-researchers`)}
+            onClick={() => navigate("/compare-researchers")}
             disabled={comparisonList.length === 0}
           >
             Go to Comparison
