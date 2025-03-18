@@ -18,6 +18,20 @@ echo "$wget_output"
 # Check if the download was successful
 if [ $exit_code -eq 0 ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Download completed successfully."
+
+    # Log start of database creation
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Creating BaseX database 'dblp'..."
+
+    # Run BaseX command to create the database from the downloaded file
+    basex -c "CREATE DB dblp dblp.xml.gz"
+
+    # Check if BaseX ran successfully
+    if [ $? -eq 0 ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] BaseX database 'dblp' created successfully."
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] BaseX database creation failed."
+    fi
+
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Download failed with exit code $exit_code."
 fi
