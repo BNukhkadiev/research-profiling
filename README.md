@@ -10,13 +10,13 @@ A powerful web-based platform for exploring researcher profiles, their publicati
 - **Integration with GitHub & Hugging Face** for open-source contributions 
 
 ## Features
-✅ **Researcher Search & Profile Page**: Retrieve data from DBLP, Semantic Scholar, etc.
-✅ **Dynamic Publication Filtering**: Filter publications by year, venue, and ranking.
-✅ **Real-Time Citation & Index Calculation**: Compute h-index, g-index, and citation counts dynamically.
-✅ **Coauthor Network Analysis**: Identify key collaborations & co-publications.
-✅ **Common Research Topics Extraction**: Uses LLM to generate topics from abstracts.
-✅ **GitHub & Hugging Face Integration**: Fetch repositories, models, and datasets.
-✅ **Comparison Feature**: Compare multiple researchers side-by-side.
+**Researcher Search & Profile Page**: Retrieve data from DBLP, Semantic Scholar, etc.
+**Dynamic Publication Filtering**: Filter publications by year, venue, and ranking.
+**Real-Time Citation & Index Calculation**: Compute h-index, g-index, and citation counts dynamically.
+**Coauthor Network Analysis**: Identify key collaborations & co-publications.
+**Common Research Topics Extraction**: Uses LLM to generate topics from abstracts.
+**GitHub & Hugging Face Integration**: Fetch repositories, models, and datasets.
+**Comparison Feature**: Compare multiple researchers side-by-side.
 
 ## Tech Stack
 - **Frontend**: React (TypeScript) + Material UI
@@ -76,10 +76,6 @@ MongoDB is used to cache researcher profiles and reduce redundant API calls.
 #### Install MongoDB
 - [MongoDB Installation Guide](https://www.mongodb.com/docs/manual/installation/)
 
-#### Start MongoDB Server
-```sh
-mongod --dbpath /path/to/mongodb/data
-```
 
 ---
 
