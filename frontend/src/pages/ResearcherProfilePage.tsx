@@ -18,6 +18,8 @@ import {
   useAddResearcher,
   useRemoveResearcher,
 } from "../react-query/useComparisonQuery";
+import { useLocation } from "react-router-dom";
+
 
 class ErrorBoundary extends React.Component {
   state = { hasError: false };
@@ -41,7 +43,10 @@ class ErrorBoundary extends React.Component {
 
 const ResearcherProfilePage: React.FC = () => {
   const { name } = useParams<{ name?: string }>();
+  const location = useLocation();
+  const isProfilePage = location.pathname.startsWith("/profile");
   const navigate = useNavigate();
+  
 
   const [filters, setFilters] = useState<{
     yearRange: [number, number] | null;
@@ -60,7 +65,7 @@ const ResearcherProfilePage: React.FC = () => {
     isLoading,
     isError,
     refetch,
-  } = useAuthorDetailsQuery(name || "");
+  } = useAuthorDetailsQuery(name || "", isProfilePage);
 
   const {
     name: authorName = "Unknown Author",

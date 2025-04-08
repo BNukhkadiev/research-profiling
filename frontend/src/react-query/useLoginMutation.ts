@@ -19,7 +19,7 @@ interface LoginResponse {
 // Define the mutation function
 const login = async (data: LoginRequest): Promise<LoginResponse> => {
   const response = await axios.post<LoginResponse>(
-    "http://127.0.0.1:8000/api/login/",
+    "http://134.155.86.170:8000/api/login/",
     data
   );
   return response.data;

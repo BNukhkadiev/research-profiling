@@ -32,7 +32,7 @@ export interface ResearcherProfileResponse {
 const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileResponse> => {
   const encodedName = encodeURIComponent(name);
   const response = await axios.get(
-    `http://127.0.0.1:8000/api/researcher-profile/?author_name=${encodedName}`
+    `http://134.155.86.170:8000/api/researcher-profile/?author_name=${encodedName}`
   );
   return response.data;
 };
@@ -42,7 +42,7 @@ const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileRe
 // **Step 3: Generate Topics (LLM)**
 const generateTopics = async (dois: string[]) => {
   if (dois.length === 0) return Promise.resolve();
-  return axios.post("http://127.0.0.1:8000/api/generate-topics/", { dois });
+  return axios.post("http://134.155.86.170:8000/api/generate-topics/", { dois });
 };
 
 // **React Query Hook for Researcher Profile**
@@ -55,7 +55,7 @@ export const useAuthorDetailsQuery = (name: string, isActive: boolean) => {
     if (dois.length === 0) return Promise.resolve();
   
     try {
-      return await axios.post("http://127.0.0.1:8000/api/open-alex/", { dois });
+      return await axios.post("http://134.155.86.170:8000/api/open-alex/", { dois });
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
@@ -248,6 +248,10 @@ export const useAuthorDetailsQuery = (name: string, isActive: boolean) => {
 
     const runOpenAlexBatches = async () => {
       for (const batch of batches) {
+        if (cancelledRef.current) {
+          console.log("🛑 OpenAlex batch cancelled due to inactive tab");
+          break;
+        }
         try {
           await fetchOpenAlexData(batch);
           batch.forEach((doi) => fetchedDOIsRef.current.add(doi));
@@ -269,14 +273,31 @@ export const useAuthorDetailsQuery = (name: string, isActive: boolean) => {
     runOpenAlexBatches();
   }, [doisToFetch, fetchOpenAlexData, queryClient, name, openAlexMutation.isLoading, isActive]);
 
+  // Reset topic generation flag when re-entering the profile page
+
+  // Reset on activation
+  React.useEffect(() => {
+    if (isActive) {
+      cancelledRef.current = false;
+      hasRunTopicGenerationRef.current = false;
+    } else {
+      cancelledRef.current = true;
+    }
+  }, [isActive]);
   
+
 
   // ✅ Trigger topic generation after OpenAlex
   const generatedDOIsRef = React.useRef<Set<string>>(new Set());
   const hasRunTopicGenerationRef = React.useRef(false);
+  const cancelledRef = React.useRef(false);
+
   
   React.useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      console.log("🚫 Not active, skipping topic generation");
+      return;
+    }
     const newDOIs = doisForTopics.filter((doi) => !generatedDOIsRef.current.has(doi));
   
     console.log("🧠 Topic check:");
@@ -294,6 +315,10 @@ export const useAuthorDetailsQuery = (name: string, isActive: boolean) => {
   
       const runBatches = async () => {
         for (const batch of batches) {
+          if (cancelledRef.current) {
+            console.log("🛑 Topic generation cancelled due to inactive tab");
+            break;
+          }
           try {
             const response = await generateTopics(batch);
             const updatedPubs = response.data?.existing_publications ?? [];

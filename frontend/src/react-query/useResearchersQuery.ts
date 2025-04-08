@@ -15,7 +15,7 @@ interface AuthorSearchResponse {
 
 // Just returns the 'results' part for UI
 const fetchResearchers = async (query: string): Promise<Record<string, Author>> => {
-  const response = await axios.get<AuthorSearchResponse>("http://127.0.0.1:8000/api/search/", {
+  const response = await axios.get<AuthorSearchResponse>("http://134.155.86.170:8000/api/search/", {
     params: { query },
   });
 

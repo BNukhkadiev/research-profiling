@@ -21,7 +21,7 @@ interface Publication {
 // Fetch function for publications
 const fetchPublications = async (authorId: string): Promise<Publication[]> => {
   const response = await axios.get(
-    "http://127.0.0.1:8000/api/sem-scholar-publication-search/",
+    "http://134.155.86.170:8000/api/sem-scholar-publication-search/",
     {
       params: { author_id: authorId }, // Use `author_id` as the query parameter
     }

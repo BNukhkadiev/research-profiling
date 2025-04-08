@@ -30,7 +30,7 @@ export interface ResearcherProfileResponse {
 const fetchResearcherProfile = async (name: string): Promise<ResearcherProfileResponse> => {
   if (!name) throw new Error("Author name is required");
   const encodedName = encodeURIComponent(name);
-  const response = await axios.get(`http://127.0.0.1:8000/api/researcher-profile/?author_name=${encodedName}`);
+  const response = await axios.get(`http://134.155.86.170:8000/api/researcher-profile/?author_name=${encodedName}`);
   return response.data;
 };
 

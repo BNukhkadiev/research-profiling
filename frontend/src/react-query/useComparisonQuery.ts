@@ -15,7 +15,7 @@ export const useComparisonResearchers = () => {
   } = useQuery<string[]>({
     queryKey: ["comparisonResearchers"],
     queryFn: async () => {
-      const { data } = await axios.get("http://127.0.0.1:8000/api/compare-researchers/");
+      const { data } = await axios.get("http://134.155.86.170:8000/api/compare-researchers/");
       return data.comparison_list || [];
     },
     staleTime: 1000 * 60 * 5, // 5 minutes caching
@@ -27,7 +27,7 @@ export const useComparisonResearchers = () => {
       queryKey: ["researcherProfile", name],
       queryFn: async () => {
         const response = await axios.get(
-          `http://127.0.0.1:8000/api/researcher-profile/?author_name=${name}`
+          `http://134.155.86.170:8000/api/researcher-profile/?author_name=${name}`
         );
         return response.data;
       },
@@ -55,7 +55,7 @@ export const useAddResearcher = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (name: string) => {
-      await axios.post("http://127.0.0.1:8000/api/compare-researchers/", { name });
+      await axios.post("http://134.155.86.170:8000/api/compare-researchers/", { name });
     },
     onSuccess: (_, name) => {
       queryClient.setQueryData(["comparisonResearchers"], (oldData: string[] | undefined) => {
@@ -72,7 +72,7 @@ export const useRemoveResearcher = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (name: string) => {
-      await axios.delete(`http://127.0.0.1:8000/api/compare-researchers/?name=${encodeURIComponent(name)}`);
+      await axios.delete(`http://134.155.86.170:8000/api/compare-researchers/?name=${encodeURIComponent(name)}`);
     },
     onSuccess: (_, name) => {
       queryClient.setQueryData(["comparisonResearchers"], (oldData: string[] | undefined) => {

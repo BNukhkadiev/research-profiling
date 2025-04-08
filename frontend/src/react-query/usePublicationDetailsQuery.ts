@@ -18,7 +18,7 @@ interface PublicationDetails {
 
 // Fetch function for publication details
 const fetchPublicationDetails = async (paperId: string): Promise<PublicationDetails> => {
-  const response = await axios.get("http://127.0.0.1:8000/api/paper-details/", {
+  const response = await axios.get("http://134.155.86.170:8000/api/paper-details/", {
     params: { paper_id: paperId }, // Use `paper_id` as the query parameter
   });
 

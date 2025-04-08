@@ -64,7 +64,7 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({
     setErrorGitHub("");
 
     fetch(
-      `http://127.0.0.1:8000/api/github-profile?name=${encodeURIComponent(author)}&affiliation=${encodeURIComponent(
+      `http://134.155.86.170:8000/api/github-profile?name=${encodeURIComponent(author)}&affiliation=${encodeURIComponent(
         primaryAffiliation
       )}`
     )
@@ -88,7 +88,7 @@ const ResearchersWork: React.FC<ResearchersWorkProps> = ({
     setErrorHuggingface("");
   
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/huggingfacedata?name=${encodeURIComponent(author)}`);
+      const response = await fetch(`http://134.155.86.170:8000/api/huggingfacedata?name=${encodeURIComponent(author)}`);
   
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
