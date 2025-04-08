@@ -46,7 +46,7 @@ const generateTopics = async (dois: string[]) => {
 };
 
 // **React Query Hook for Researcher Profile**
-export const useAuthorDetailsQuery = (name: string) => {
+export const useAuthorDetailsQuery = (name: string, isActive: boolean) => {
   const queryClient = useQueryClient();
   const failedDoisRef = React.useRef<Set<string>>(new Set());
   const lastRateLimitRef = React.useRef<number | null>(null);
@@ -227,6 +227,7 @@ export const useAuthorDetailsQuery = (name: string) => {
   const fetchedDOIsRef = React.useRef<Set<string>>(new Set());
 
   React.useEffect(() => {
+    if (!isActive) return;
     const now = Date.now();
     const lastLimit = lastRateLimitRef.current;
     const cooldownTime = 60 * 1000;
@@ -266,7 +267,7 @@ export const useAuthorDetailsQuery = (name: string) => {
     };
 
     runOpenAlexBatches();
-  }, [doisToFetch, fetchOpenAlexData, queryClient, name, openAlexMutation.isLoading]);
+  }, [doisToFetch, fetchOpenAlexData, queryClient, name, openAlexMutation.isLoading, isActive]);
 
   
 
@@ -275,6 +276,7 @@ export const useAuthorDetailsQuery = (name: string) => {
   const hasRunTopicGenerationRef = React.useRef(false);
   
   React.useEffect(() => {
+    if (!isActive) return;
     const newDOIs = doisForTopics.filter((doi) => !generatedDOIsRef.current.has(doi));
   
     console.log("🧠 Topic check:");
@@ -318,7 +320,7 @@ export const useAuthorDetailsQuery = (name: string) => {
   
       runBatches();
     }
-  }, [doisForTopics, generateTopicsMutation, queryClient, name]);
+  }, [doisForTopics, generateTopicsMutation, queryClient, name, isActive]);
   
 
   return {

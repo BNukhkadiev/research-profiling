@@ -74,7 +74,7 @@ class OllamaTextProcessor:
 
     # ---------------- Prompt Builders -------------------
     def build_topic_prompt(self, batch):
-        prompt = "Given the following research papers, extract 2-3 key research topics for each paper.\n\n"
+        prompt = "Given the following research papers, generate 2-3 key research topics for each paper.\n\n"
         prompt += "Respond ONLY in this exact JSON format:\n{\n  \"DOI\": [\"topic1\", \"topic2\"],\n  \"DOI\": [\"topic1\", \"topic2\", \"DOI\"]\n}\n\n"
         for paper in batch:
             prompt += f"DOI: {paper['id']}\nTitle: {paper['title']}\nAbstract: {paper['abstract']}\n\n"
