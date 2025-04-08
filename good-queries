@@ -1,0 +1,32 @@
+## OKay query
+
+let $author_name := lower-case('Heiko Paulheim')
+let $tokens := tokenize($author_name, '\s+')
+
+let $exact_matches :=
+  for $entry in //www
+  let $author := lower-case(normalize-space(string-join($entry/author, ' ')))
+  where $author = $author_name
+  return $entry
+
+let $partial_matches :=
+  for $entry in //www
+  let $author := lower-case(normalize-space(string-join($entry/author, ' ')))
+  where $author != $author_name and (
+    some $token in $tokens
+    satisfies contains($author, $token)
+  )
+  return $entry
+
+for $entry in ($exact_matches, $partial_matches)
+return
+  <result>
+    <author>{ $entry/author }</author>
+    {
+      for $aff in $entry/note[@type='affiliation']
+      return
+        <affiliation label="{ $aff/@label }">
+          { $aff/text() }
+        </affiliation>
+    }
+  </result>

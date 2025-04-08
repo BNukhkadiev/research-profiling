@@ -83,6 +83,7 @@ REST_FRAMEWORK = {
 }
 
 
+
 WSGI_APPLICATION = 'backend.wsgi.application'
 
 

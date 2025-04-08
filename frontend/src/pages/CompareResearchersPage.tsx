@@ -24,6 +24,9 @@ import PublicationsLineChart from "../components/PublicationsLineChart";
 import CoreRankingBarChart from "../components/CoreRankingBarChart";
 import ResearchAreasPieChart from "../components/ResearchAreasPieChart";
 import WordCloudChart from "../components/WordCloudChart";
+import NetworkGraph from "../components/NetworkGraph";
+import PreprintFinalizedBarChart from "../components/PreprintFinalizedBarChart";
+
 
 const computeHIndex = (publications: { citations?: number }[]) => {
   const sortedCitations = publications
@@ -89,6 +92,28 @@ const CompareResearchersPage = () => {
       });
     }
   };
+
+  const networkGraphData = researchers.map(({ data }) => {
+    const totalPapers = data?.publications?.length || 0;
+    const totalCitations = data?.publications?.reduce(
+      (sum, pub) => sum + (pub.citations ?? 0),
+      0
+    );
+
+    return {
+      name: data?.name || "Unknown",
+      totalPapers,
+      totalCitations,
+      coauthors: data?.coauthors || [],
+    };
+  });
+  
+  const preprintFinalizedData = researchers.map(({ data }) => ({
+    name: data?.name || "Unknown",
+    papers: data?.publications?.map((pub) => ({
+      is_preprint: pub.is_preprint ?? false,
+    })) || [],
+  }));
 
   if (isLoading) {
     return (
@@ -261,7 +286,17 @@ const CompareResearchersPage = () => {
               />
             </Grid>
           </Grid>
-
+          {/* Network Graph */}
+          <Box sx={{ marginTop: 4 }}>
+              <Typography variant="h5" sx={{ textAlign: "center", marginBottom: 2 }}>
+                Co-authorship Network
+              </Typography>
+              <NetworkGraph researchers={networkGraphData} />
+          </Box>
+          {/* Preprint vs Finalized Bar Chart */}
+          <Box sx={{ marginTop: 4 }}>
+            <PreprintFinalizedBarChart researchers={preprintFinalizedData} />
+          </Box>
           {/* Pie Chart */}
           <Box sx={{ marginTop: 4 }}>
             <ResearchAreasPieChart
@@ -298,6 +333,7 @@ const CompareResearchersPage = () => {
               </Grid>
             ))}
           </Grid>
+
         </>
       )}
     </Box>

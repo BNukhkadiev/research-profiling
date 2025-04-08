@@ -140,18 +140,23 @@ class SearchView(APIView):
     def get(self, request):
         start_time = time.time()
         search_query = request.GET.get('query', '').strip()
+
         if not search_query:
             return Response({"error": "Query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         search_service = AuthorSearchService(search_query)
-        authors = search_service.search_single_author()
+        author_results = search_service.search_and_save_authors()
         end_time = time.time()
-        print("Time taken to process:", end_time - start_time)
-        if not authors:
-            return Response({"error": "No authors found."}, status=status.HTTP_404_NOT_FOUND)
 
-        return Response({"authors": authors}, status=status.HTTP_200_OK)
+        print("Time taken to process:", round(end_time - start_time, 2), "seconds")
 
+        if not author_results:
+            return Response(
+                {"error": f"No authors found for query '{search_query}'."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({"query": search_query, "results": author_results}, status=status.HTTP_200_OK)
 
 
 class ResearcherProfileView(APIView):
@@ -238,6 +243,12 @@ class OpenAlexView(APIView):
         # Fetch from OpenAlex for those without abstract
         fetched_data = asyncio.run(OpenAlexFetcher.fetch_openalex_data(dois_to_fetch))
 
+        if isinstance(fetched_data, dict) and fetched_data.get("error") == 429:
+            return Response(
+                {"error": "OpenAlex rate-limited. Please wait before retrying."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
         updated_count = 0
 
         # Update publications in MongoDB

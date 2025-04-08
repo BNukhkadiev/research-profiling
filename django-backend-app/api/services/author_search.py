@@ -11,85 +11,116 @@ class AuthorSearchService:
     def __init__(self, query):
         self.query = query.strip()
 
-    def search_single_author(self):
+    def search_and_save_authors(self):
         """
-        Searches for a single author in MongoDB, checks if they have a description and affiliations,
-        and retrieves missing information if necessary.
+        Fuzzy search for authors matching the query,
+        then get affiliations, publications, and store in MongoDB.
         """
-        cached_author = Author.objects(name=self.query).first()
-        affiliations = cached_author.affiliations if cached_author else None
-        description = cached_author.description if cached_author else None
+        matched_authors = self._get_author_affiliations(self.query)
+        if not matched_authors:
+            return {"error": f"No matches found for '{self.query}'."}
 
-        # If affiliations are missing, fetch from BaseX
-        if not affiliations:
-            logger.info(f"Fetching affiliations for author '{self.query}' from BaseX.")
-            affiliations = self._get_author_affiliations(self.query)
+        results = {}
+        for author_name, affiliations in matched_authors.items():
+            cached_author = Author.objects(name=author_name).first()
+            description = cached_author.description if cached_author else None
 
-        # Fetch paper titles only if description is missing
-        paper_titles = []
-        if not description:
-            paper_titles = self._get_publication_titles(self.query)
-            if not paper_titles and not affiliations:
-                logger.info(f"No data found in BaseX for author '{self.query}'.")
-                return {"error": f"No data found for author '{self.query}'. Please check the name and try again."}
+            # Fetch titles if description missing
+            paper_titles = []
+            if not description:
+                paper_titles = self._get_publication_titles(author_name)
+                description = self._get_researcher_description(author_name, paper_titles)
 
-            logger.info(f"Generating description for author '{self.query}'")
-            description = self._get_researcher_description(self.query, paper_titles)
+            # Save to DB
+            if cached_author:
+                cached_author.description = cached_author.description or description
+                cached_author.affiliations = cached_author.affiliations or affiliations
+                cached_author.save()
+                logger.info(f"Updated author '{author_name}' in MongoDB.")
+            else:
+                Author(
+                    name=author_name,
+                    description=description,
+                    affiliations=affiliations
+                ).save()
+                logger.info(f"Saved new author '{author_name}' to MongoDB.")
 
-        # Save or update author in MongoDB
-        if cached_author:
-            cached_author.description = cached_author.description or description
-            cached_author.affiliations = cached_author.affiliations or affiliations
-            cached_author.save()
-            logger.info(f"Updated author '{self.query}' in MongoDB.")
-        else:
-            author_doc = Author(
-                name=self.query,
-                description=description,
-                affiliations=affiliations
-            )
-            author_doc.save()
-            logger.info(f"Saved new author '{self.query}' to MongoDB.")
+            results[author_name] = {
+                "description": description,
+                "affiliations": affiliations
+            }
 
-        return {
-            "name": self.query,
-            "description": description,
-            "affiliations": affiliations
-        }
+        return results
 
-    def _get_author_affiliations(self, author_name):
-        """Fetch unique affiliations for a given author from BaseX."""
+    def _get_author_affiliations(self, author_query, limit=5):
+        """Uses fuzzy + exact match to get authors and their affiliations from BaseX."""
+        from BaseXClient import BaseXClient
+        import xml.etree.ElementTree as ET
+
         session = BaseXClient.Session('localhost', 1984, 'admin', 'admin')
-        affiliations = []
+        author_aff_map = {}
+
+        xquery = f"""
+        let $author_name := lower-case('{author_query}')
+
+        let $exact :=
+          for $entry in //www
+          let $author := lower-case(normalize-space(string-join($entry/author, ' ')))
+          where $author = $author_name
+          return element result {{
+            attribute type {{ "exact" }},
+            <author>{{ $entry/author }}</author>,
+            for $aff in $entry/note[@type='affiliation']
+            return <affiliation label="{{ $aff/@label }}">{{ $aff/text() }}</affiliation>
+          }}
+
+        let $partial :=
+          for $entry in //www[author contains text {{ $author_name }} using fuzzy]
+          let $author := lower-case(normalize-space(string-join($entry/author, ' ')))
+          where $author != $author_name
+          return element result {{
+            attribute type {{ "partial" }},
+            <author>{{ $entry/author }}</author>,
+            for $aff in $entry/note[@type='affiliation']
+            return <affiliation label="{{ $aff/@label }}">{{ $aff/text() }}</affiliation>
+          }}
+        let $partial_limited := subsequence($partial, 1, {limit})
+        return ($exact, $partial_limited)
+        """
 
         try:
             session.execute("OPEN dblp")
+            result = session.execute(f'XQUERY {xquery}')
 
-            query_text = f"""
-            let $author_name := '{author_name}'
-            for $aff in distinct-values(
-                //(article|inproceedings|book|incollection|phdthesis|mastersthesis|proceedings|www|data)[author = $author_name]/note[@type='affiliation']/text()
-            )
-            return <affiliation>{{$aff}}</affiliation>
-            """
+            root = ET.fromstring(f"<results>{result}</results>")
+            for res in root.findall('result'):
+                author_container = res.find('author')
+                if not author_container:
+                    continue
+                authors = [a.text for a in author_container.findall('author') if a.text]
+                affiliations = [
+                    aff.text for aff in res.findall('affiliation') if aff.text
+                ]
+                for author in authors:
+                    if author in author_aff_map:
+                        author_aff_map[author].extend(
+                            a for a in affiliations if a not in author_aff_map[author]
+                        )
+                    else:
+                        author_aff_map[author] = affiliations
 
-            query = session.query(query_text)
-
-            for _, item in query.iter():
-                try:
-                    elem = ET.fromstring(item)
-                    affiliations.append(elem.text.strip())
-                except ET.ParseError as e:
-                    logger.error(f"Parse error: {e} on item: {item}")
-
-            query.close()
-            return affiliations
-
+        except Exception as e:
+            logger.error(f"BaseX query failed: {e}")
         finally:
             session.close()
 
+        return author_aff_map
+
     def _get_publication_titles(self, author_name, limit=10):
-        """Fetch and parse publication titles for a given author."""
+        """Fetch and parse publication titles for a given author (exact match only)."""
+        from BaseXClient import BaseXClient
+        import xml.etree.ElementTree as ET
+
         session = BaseXClient.Session('localhost', 1984, 'admin', 'admin')
         publications = []
 
@@ -112,28 +143,28 @@ class AuthorSearchService:
                     if title:
                         publications.append(title.strip())
                 except ET.ParseError as e:
-                    logger.error(f"Parse error: {e} on item: {item}")
+                    logger.warning(f"Skipping publication due to parse error: {e}")
 
             query.close()
-            return list(dict.fromkeys(publications))[:limit]  # Deduplicate and limit
+            return list(dict.fromkeys(publications))[:limit]
 
         finally:
             session.close()
 
     def _get_researcher_description(self, name, paper_titles):
-        """Generate a short researcher description using Ollama LLM."""
+        """Generate a short researcher description using Ollama or fallback."""
         processor = OllamaTextProcessor(batch_size=1, max_tokens=50, temperature=0.7)
-
         researcher = {
             "name": name,
             "papers": [{"title": title} for title in paper_titles[:10]]
         }
 
-        # description = processor.generate_description(researcher)
-        description = "blla blla blla"
+        description = processor.generate_description(researcher)
+        # description = "blla blla blla"  # Placeholder
 
         if not description:
             logger.error(f"Failed to generate description for {name}.")
             return "Description generation failed."
 
         return description
+

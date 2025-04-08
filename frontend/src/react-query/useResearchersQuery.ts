@@ -1,30 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
-// Define Author type
-interface Author {
-  name: string;
+// Type for each author in results
+export interface Author {
   description: string;
   affiliations: string[];
 }
 
-// Fetch function for single researcher
-const fetchResearcher = async (query: string): Promise<Author | null> => {
-  const response = await axios.get("http://127.0.0.1:8000/api/search/", {
+// Full response type from backend
+interface AuthorSearchResponse {
+  query: string;
+  results: Record<string, Author>; // key = author name
+}
+
+// Just returns the 'results' part for UI
+const fetchResearchers = async (query: string): Promise<Record<string, Author>> => {
+  const response = await axios.get<AuthorSearchResponse>("http://127.0.0.1:8000/api/search/", {
     params: { query },
   });
 
-  // Extract and return single author object
-  return response.data.authors || null;
+  return response.data.results || {};
 };
 
-// React Query hook for fetching single researcher
+// React Query hook to fetch multiple researchers
 export const useResearcherQuery = (query: string) => {
-  return useQuery<Author | null>({
-    queryKey: ["researcher", query], // Unique cache key
-    queryFn: () => fetchResearcher(query), // Fetch function
-    enabled: !!query, // Only fetch if query is not empty
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: 2, // Retry twice on failure
+  return useQuery<Record<string, Author>>({
+    queryKey: ["researcher", query],
+    queryFn: () => fetchResearchers(query),
+    enabled: !!query,
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
   });
 };

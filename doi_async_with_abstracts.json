@@ -1,0 +1,37 @@
+[
+    {
+        "id": "https://openalex.org/W2970771982",
+        "doi": "https://doi.org/10.18653/v1/d19-1371",
+        "title": "SciBERT: A Pretrained Language Model for Scientific Text",
+        "cited_by_count": 2362,
+        "abstract": "Iz Beltagy, Kyle Lo, Arman Cohan. Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP). 2019."
+    },
+    {
+        "id": "https://openalex.org/W4404343233",
+        "doi": "https://doi.org/10.48550/arxiv.2410.23223",
+        "title": "COMAL: A Convergent Meta-Algorithm for Aligning LLMs with General\n  Preferences",
+        "cited_by_count": 0,
+        "abstract": "Many alignment methods, including reinforcement learning from human feedback (RLHF), rely on the Bradley-Terry reward assumption, which is insufficient to capture the full range of general human preferences. To achieve robust alignment with general preferences, we model the alignment problem as a two-player zero-sum game, where the Nash equilibrium policy guarantees a 50% win rate against any competing policy. However, previous algorithms for finding the Nash policy either diverge or converge to a Nash policy in a modified game, even in a simple synthetic setting, thereby failing to maintain the 50% win rate guarantee against all other policies. We propose a meta-algorithm, Convergent Meta Alignment Algorithm (COMAL), for language model alignment with general preferences, inspired by convergent algorithms in game theory. Theoretically, we prove that our meta-algorithm converges to an exact Nash policy in the last iterate. Additionally, our meta-algorithm is simple and can be integrated with many existing methods designed for RLHF and preference optimization with minimal changes. Experimental results demonstrate the effectiveness of the proposed framework when combined with existing preference policy optimization methods."
+    },
+    {
+        "id": "https://openalex.org/W275999487",
+        "doi": "https://doi.org/10.1007/978-3-319-16354-3_59",
+        "title": "Retrieving Medical Literature for Clinical Decision Support",
+        "cited_by_count": 30,
+        "abstract": null
+    },
+    {
+        "id": "https://openalex.org/W4404389487",
+        "doi": "https://doi.org/10.48550/arxiv.2411.05338",
+        "title": "SciDQA: A Deep Reading Comprehension Dataset over Scientific Papers",
+        "cited_by_count": 0,
+        "abstract": "Scientific literature is typically dense, requiring significant background knowledge and deep comprehension for effective engagement. We introduce SciDQA, a new dataset for reading comprehension that challenges LLMs for a deep understanding of scientific articles, consisting of 2,937 QA pairs. Unlike other scientific QA datasets, SciDQA sources questions from peer reviews by domain experts and answers by paper authors, ensuring a thorough examination of the literature. We enhance the dataset's quality through a process that carefully filters out lower quality questions, decontextualizes the content, tracks the source document across different versions, and incorporates a bibliography for multi-document question-answering. Questions in SciDQA necessitate reasoning across figures, tables, equations, appendices, and supplementary materials, and require multi-document reasoning. We evaluate several open-source and proprietary LLMs across various configurations to explore their capabilities in generating relevant and factual responses. Our comprehensive evaluation, based on metrics for surface-level similarity and LLM judgements, highlights notable performance discrepancies. SciDQA represents a rigorously curated, naturally derived scientific QA dataset, designed to facilitate research on complex scientific text understanding."
+    },
+    {
+        "id": "https://openalex.org/W4402670791",
+        "doi": "https://doi.org/10.18653/v1/2024.findings-acl.33",
+        "title": "MedAgents: Large Language Models as Collaborators for Zero-shot Medical Reasoning",
+        "cited_by_count": 10,
+        "abstract": null
+    }
+]

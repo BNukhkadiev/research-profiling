@@ -39,8 +39,6 @@ class OllamaTextProcessor:
         url = f"http://localhost:{port}/api/generate"
         print(f"[INFO] Sending request to Ollama on port {port}")
 
-        time.sleep(1)
-
         response = requests.post(url, json={
             "model": self.model,
             "prompt": prompt,
@@ -75,19 +73,14 @@ class OllamaTextProcessor:
     # ---------------- Prompt Builders -------------------
     def build_topic_prompt(self, batch):
         prompt = "Given the following research papers, extract 2-3 key research topics for each paper.\n\n"
-        prompt += "Respond ONLY in this exact JSON format:\n{\n  \"DOI\": [\"topic1\", \"topic2\"],\n  \"DOI\": [\"topic1\", \"topic2\", \"DOI\"]\n}\n\n"
+        prompt += "Respond ONLY in this exact JSON format:\n{\n  \"paper_id1\": [\"topic1\", \"topic2\"],\n  \"paper_id2\": [\"topic1\", \"topic2\", \"topic3\"]\n}\n\n"
         for paper in batch:
-            prompt += f"DOI: {paper['id']}\nTitle: {paper['title']}\nAbstract: {paper['abstract']}\n\n"
+            prompt += f"Paper ID: {paper['id']}\nTitle: {paper['title']}\nAbstract: {paper['abstract']}\n\n"
         return prompt
 
     def build_description_prompt(self, researcher):
-        paper_titles = ", ".join(paper["title"] for paper in researcher["papers"])
-
-        return (
-            f"Write a CONCISE two-sentence summary of {researcher['name']}'s research focus and contributions. "
-            f"Notable papers: {paper_titles}. "
-            f"DO NOT include introductions, disclaimers, or extra details."
-        )
+        return f"Generate a concise and professional researcher description for {researcher['name']}, summarizing in two sentences their key areas of expertise based on the following papers:\n\n" + \
+               "\n\n".join(f"- {paper['title']}" for paper in researcher['papers'])
 
     # ---------------- Response Parsing -------------------
     def parse_topic_response(self, response_text, batch):
@@ -115,11 +108,12 @@ class OllamaTextProcessor:
             prompt = self.build_topic_prompt(batch)
         else:
             prompt = self.build_description_prompt(batch[0])  # Only one researcher per batch
+
         result = self.send_request_to_ollama(prompt)
-        print("Result", result)
         if not result:
             print("[ERROR] Empty response from model")
             return {} if task == "topics" else ""
+
         return self.parse_topic_response(result, batch) if task == "topics" else result
 
     # ---------------- Public Methods -------------------
@@ -130,6 +124,7 @@ class OllamaTextProcessor:
 
         with ThreadPoolExecutor(max_workers=len(OLLAMA_PORTS)) as executor:
             results = list(executor.map(self.process_batch, batches))
+
         for batch_result in results:
             topics.update(batch_result)
 
